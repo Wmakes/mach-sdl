@@ -1,0 +1,54 @@
+# OpenGL context management
+#
+# creates/destroys the GL context attached to a window and exposes
+# get_proc_address, which is the actual handoff point to mach-gl: load
+# each GL function you need with it and reinterpret the result with `:~`
+# (bit-reinterpret is correct here specifically because a `ptr` and a
+# function-pointer type are both machine-pointer-width -- same size on
+# both sides of the cast, unlike the Event/KeyboardEvent case in
+# events.mach, which needed a `::` pointer-cast instead because the sizes
+# differ there).
+
+use sdl.c;
+use sdl.window.Window;
+use std.types.bool.bool;
+
+# create a GL context for a window and make it current
+# ---
+# window: window to attach the context to (must have been created with
+#         WINDOW_OPENGL set)
+# ret:    the context handle, or nil on failure -- check core.get_error()
+pub fun create_context(window: Window) ptr {
+    val ctx: ptr = c.SDL_GL_CreateContext(window.handle);
+    if (ctx == nil) { ret nil; }
+    if (c.SDL_GL_MakeCurrent(window.handle, ctx) == 0) {
+        c.SDL_GL_DestroyContext(ctx);
+        ret nil;
+    }
+    ret ctx;
+}
+
+# destroy a GL context
+# ---
+# context: context returned by create_context
+pub fun destroy_context(context: ptr) {
+    c.SDL_GL_DestroyContext(context);
+}
+
+# present the back buffer
+# ---
+# window: window whose context is current
+# ret:    true on success
+pub fun swap_window(window: Window) bool {
+    ret c.SDL_GL_SwapWindow(window.handle) != 0;
+}
+
+# address of a GL function for the current context. reinterpret with
+# `:~` as the matching function type before calling -- see the module
+# header for why `:~` (not `::`) is correct here
+# ---
+# proc: function name, e.g. "glClearColor"
+# ret:  function address, or nil if not found
+pub fun get_proc_address(proc: *u8) ptr {
+    ret c.SDL_GL_GetProcAddress(proc);
+}

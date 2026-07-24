@@ -1,0 +1,59 @@
+# the flat public surface of the mach-sdl bindings
+#
+# re-exports everything under one namespace so consumers can write
+# `use sdl.sdl;` and reach the whole v1 API as sdl.init(),
+# sdl.open_gl_window(), sdl.poll_event(), and so on. the split modules
+# (sdl.core, sdl.window, ...) remain importable individually.
+#
+# hand-written for now. mach-glfw generates its equivalent file with
+# tools/surface.sh -- worth adopting the same tooling here once this
+# surface stabilizes, so it can't drift out of sync by hand.
+
+use sdl.c;
+use sdl.core;
+use sdl.window;
+use sdl.events;
+use sdl.key;
+use sdl.gl;
+
+fwd c.Event;
+fwd c.KeyboardEvent;
+
+fwd core.INIT_VIDEO;
+fwd core.INIT_EVENTS;
+fwd core.init;
+fwd core.quit;
+fwd core.get_error;
+
+fwd window.Window;
+fwd window.WINDOW_OPENGL;
+fwd window.WINDOW_RESIZABLE;
+fwd window.window_is_valid;
+fwd window.create_window;
+fwd window.open_gl_window;
+fwd window.destroy_window;
+
+fwd events.EVENT_QUIT;
+fwd events.EVENT_KEY_DOWN;
+fwd events.EVENT_KEY_UP;
+fwd events.poll_event;
+fwd events.event_type;
+fwd events.as_keyboard;
+fwd events.key_is_fresh_press;
+
+fwd key.A;
+fwd key.D;
+fwd key.S;
+fwd key.W;
+fwd key.RETURN;
+fwd key.ESCAPE;
+fwd key.SPACE;
+fwd key.RIGHT;
+fwd key.LEFT;
+fwd key.DOWN;
+fwd key.UP;
+
+fwd gl.create_context;
+fwd gl.destroy_context;
+fwd gl.swap_window;
+fwd gl.get_proc_address;

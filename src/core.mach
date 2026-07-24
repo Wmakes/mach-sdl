@@ -1,0 +1,43 @@
+# library lifecycle and error query
+#
+# wraps SDL_Init/SDL_Quit/SDL_GetError with mach-idiomatic types. all
+# functions are thin wrappers over sdl.c -- SDL3's bool is a real 1-byte
+# C99 bool, unwrapped here the same way mach-glfw unwraps GLFW's
+# int-based booleans (`!= 0`).
+
+use sdl.c;
+use std.types.bool.bool;
+use std.types.string.str;
+
+pub val INIT_VIDEO:  u32 = c.INIT_VIDEO;
+pub val INIT_EVENTS: u32 = c.INIT_EVENTS;
+
+# initialize SDL subsystems. call before creating a window
+# ---
+# flags: bitwise OR of INIT_* values
+# ret:   true on success; check get_error() on false
+pub fun init(flags: u32) bool {
+    ret c.SDL_Init(flags) != 0;
+}
+
+# shut down all SDL subsystems and free resources
+pub fun quit() {
+    c.SDL_Quit();
+}
+
+# the last error message set on this thread
+#
+# SDL owns the returned string; it's valid until the next SDL call that
+# sets a new error. copy it before calling anything else if you need to
+# keep it.
+# ---
+# ret: a UTF-8, SDL-owned string; never nil, but may be empty
+pub fun get_error() str {
+    ret c.SDL_GetError();
+}
+
+test "core: get_error is non-nil before init" {
+    val msg: str = get_error();
+    if (msg == nil) { ret 1; }
+    ret 0;
+}

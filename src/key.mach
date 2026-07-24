@@ -1,0 +1,26 @@
+# physical key scancodes
+#
+# scancode identifies a physical key position, independent of keyboard
+# layout (SDL_scancode.h calls this "the American Standard" position);
+# use these against KeyboardEvent.scancode for movement/action keys where
+# you want the same physical key regardless of layout (WASD stays under
+# the left hand on an AZERTY board, for instance). use `key` (the
+# SDL_Keycode) instead when you care what character the user's layout
+# actually produces.
+#
+# only the subset actually needed for a game loop so far -- add more as
+# needed, transcribing straight from SDL_scancode.h, not from memory.
+
+pub val A: u32 = 4;
+pub val D: u32 = 7;
+pub val S: u32 = 22;
+pub val W: u32 = 26;
+
+pub val RETURN: u32 = 40;
+pub val ESCAPE: u32 = 41;
+pub val SPACE:  u32 = 44;
+
+pub val RIGHT: u32 = 79;
+pub val LEFT:  u32 = 80;
+pub val DOWN:  u32 = 81;
+pub val UP:    u32 = 82;

@@ -1,0 +1,81 @@
+# raw C-ABI imports of SDL 3.2
+#
+# every SDL function is a pub ext fun with its C name and C-faithful types,
+# transcribed directly from SDL3's own headers (SDL_init.h, SDL_video.h,
+# SDL_events.h, SDL_error.h -- release-3.2.0 tag). SDL3's `bool` is a real
+# C99 _Bool (1 byte), so every SDL bool-returning function is declared `u8`
+# here and unwrapped with `!= 0` in the idiomatic wrapper modules, the same
+# way mach-glfw unwraps GLFW's int-based booleans in its own core.mach.
+#
+# v1 scope only: init/quit, one window, poll_event, and the GL context
+# functions needed to hand off to mach-gl. audio, renderer, gamepad,
+# haptics, camera, and sensors are all deferred.
+
+# --- SDL_init.h ---
+
+pub val INIT_VIDEO:  u32 = 0x00000020;
+pub val INIT_EVENTS: u32 = 0x00004000;
+
+pub ext fun SDL_Init(flags: u32) u8;
+pub ext fun SDL_Quit();
+
+# --- SDL_error.h ---
+
+pub ext fun SDL_GetError() *u8;
+
+# --- SDL_video.h ---
+
+pub val WINDOW_OPENGL:    u64 = 0x0000000000000002;
+pub val WINDOW_RESIZABLE: u64 = 0x0000000000000020;
+
+pub ext fun SDL_CreateWindow(title: *u8, w: i32, h: i32, flags: u64) ptr;
+pub ext fun SDL_DestroyWindow(window: ptr);
+
+pub ext fun SDL_GL_CreateContext(window: ptr) ptr;
+pub ext fun SDL_GL_MakeCurrent(window: ptr, context: ptr) u8;
+pub ext fun SDL_GL_SwapWindow(window: ptr) u8;
+pub ext fun SDL_GL_GetProcAddress(proc: *u8) ptr;
+pub ext fun SDL_GL_DestroyContext(context: ptr) u8;
+
+# --- SDL_events.h ---
+
+pub val EVENT_QUIT:     u32 = 0x100;
+pub val EVENT_KEY_DOWN: u32 = 0x300;
+pub val EVENT_KEY_UP:   u32 = 0x301;
+
+# SDL_Event: a 128-byte tagged union, size fixed by SDL's own
+# `Uint8 padding[128]` member (and a compile-time assert on their end that
+# sizeof(SDL_Event) == sizeof(padding)) specifically so it's ABI-stable
+# across SDL versions. `event_type` is the discriminant; reinterpret the
+# same bytes as KeyboardEvent once you've checked it -- same trick
+# std.term.windows' InputRecord needed.
+pub rec Event {
+    event_type: u32;
+    _pad:       [124]u8;
+}
+
+# SDL_KeyboardEvent, transcribed field-for-field from SDL_events.h. sizes:
+# type/reserved u32(4)+u32(4), timestamp Uint64(8), windowID/which
+# u32(4)+u32(4), scancode/key u32(4)+u32(4), mod Uint16(2), raw Uint16(2),
+# down/repeat bool(1)+bool(1) = 38 bytes, padded to 40 for the Uint64's
+# 8-byte alignment requirement.
+pub rec KeyboardEvent {
+    event_type: u32;
+    reserved:   u32;
+    timestamp:  u64;
+    window_id:  u32;
+    which:      u32;
+    scancode:   u32;
+    key:        u32;
+    mod_:       u16;
+    raw:        u16;
+    down:       u8;
+    repeat:     u8;
+}
+
+pub ext fun SDL_PollEvent(event: *Event) u8;
+
+test "sdl.c: KeyboardEvent layout is 40 bytes" {
+    if ($size_of(KeyboardEvent) != 40) { ret 1; }
+    ret 0;
+}

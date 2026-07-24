@@ -1,0 +1,48 @@
+[project]
+id = "sdl"
+version = "0.1.0"
+src = "src"
+out = "out/{target.name}/{profile.name}"
+
+[target.linux-x86_64]
+isa = "x86_64"
+os  = "linux"
+abi = "sysv64"
+
+[target.windows]
+isa = "x86_64"
+os  = "windows"
+abi = "win64"
+
+[target.darwin]
+isa = "x86_64"
+os  = "darwin"
+abi = "sysv64"
+
+[artifact.sdl]
+kind    = "bin"
+entry   = "main.mach"
+out     = "bin/sdl"
+targets = ["*"]
+link    = ["sdl", "sdl-win"]
+need    = []
+
+[link.sdl]
+source = "system"
+name   = "SDL3"
+os     = ["linux", "darwin"]
+isa    = "*"
+abi    = "*"
+export = true
+
+[link.sdl-win]
+source = "system"
+name   = "SDL3.dll"
+os     = ["windows"]
+isa    = "*"
+abi    = "*"
+export = true
+
+[dep.mach-std]
+git = "https://github.com/briar-systems/mach-std"
+ref = "branch/main"

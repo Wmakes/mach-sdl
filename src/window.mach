@@ -1,0 +1,55 @@
+# window lifecycle
+#
+# a Window is a by-value wrapper around the opaque SDL_Window handle.
+# fallible constructors return a nil-handle Window; check with
+# window_is_valid and query sdl.core.get_error for the cause.
+
+use sdl.c;
+use std.types.bool.bool;
+use std.types.string.str;
+
+# handle to an SDL window
+# ---
+# handle: opaque SDL_Window pointer, nil when invalid
+pub rec Window {
+    handle: ptr;
+}
+
+pub val WINDOW_OPENGL:    u64 = c.WINDOW_OPENGL;
+pub val WINDOW_RESIZABLE: u64 = c.WINDOW_RESIZABLE;
+
+# whether a Window holds a live handle
+# ---
+# window: window to test
+# ret:    true if the handle is non-nil
+pub fun window_is_valid(window: Window) bool {
+    ret window.handle != nil;
+}
+
+# create a window
+# ---
+# title:  UTF-8 window title
+# w:      width in pixels
+# h:      height in pixels
+# flags:  bitwise OR of WINDOW_* values
+# ret:    the new Window; nil handle on failure -- check core.get_error()
+pub fun create_window(title: str, w: i32, h: i32, flags: u64) Window {
+    ret Window{ handle: c.SDL_CreateWindow(title, w, h, flags) };
+}
+
+# create_window sugar for the common windowed-with-GL case
+# ---
+# title: UTF-8 window title
+# w:     width in pixels
+# h:     height in pixels
+# ret:   the new Window; nil handle on failure
+pub fun open_gl_window(title: str, w: i32, h: i32) Window {
+    ret create_window(title, w, h, WINDOW_OPENGL | WINDOW_RESIZABLE);
+}
+
+# destroy a window and its context
+# ---
+# window: window to destroy
+pub fun destroy_window(window: Window) {
+    c.SDL_DestroyWindow(window.handle);
+}

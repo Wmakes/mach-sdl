@@ -1,0 +1,85 @@
+# demo executable for the mach-sdl bindings
+#
+# opens a window with an OpenGL context, loads glClearColor/glClear
+# through the context's proc loader, and clears the screen until the
+# window is closed or Escape is pressed.
+#
+# loads GL functions by hand here, same as mach-glfw's own demo does --
+# wiring this through mach-gl properly (rather than two hand-loaded
+# functions) is follow-up work once this compiles and runs.
+
+use std.runtime;
+use print: std.print;
+use sdl: sdl.sdl;
+
+# glClearColor(red, green, blue, alpha)
+def GlClearColorFun: fun(f32, f32, f32, f32);
+# glClear(mask)
+def GlClearFun: fun(u32);
+
+val GL_COLOR_BUFFER_BIT: u32 = 0x00004000;
+
+#[symbol("main")]
+fun main(argc: i64, argv: **u8) i64 {
+    if (!sdl.init(sdl.INIT_VIDEO)) {
+        print.eprint("SDL_Init failed: ");
+        print.eprintln(sdl.get_error());
+        ret 1;
+    }
+
+    val w: sdl.Window = sdl.open_gl_window("mach-sdl", 800, 600);
+    if (!sdl.window_is_valid(w)) {
+        print.eprint("SDL_CreateWindow failed: ");
+        print.eprintln(sdl.get_error());
+        sdl.quit();
+        ret 1;
+    }
+
+    val ctx: ptr = sdl.create_context(w);
+    if (ctx == nil) {
+        print.eprint("GL context creation failed: ");
+        print.eprintln(sdl.get_error());
+        sdl.destroy_window(w);
+        sdl.quit();
+        ret 1;
+    }
+
+    val clear_color: GlClearColorFun = sdl.get_proc_address("glClearColor"):~GlClearColorFun;
+    val clear: GlClearFun = sdl.get_proc_address("glClear"):~GlClearFun;
+    if (clear_color == nil || clear == nil) {
+        print.eprintln("failed to load GL functions");
+        sdl.destroy_context(ctx);
+        sdl.destroy_window(w);
+        sdl.quit();
+        ret 1;
+    }
+
+    var running: u8 = 1;
+    var ev: sdl.Event;
+
+    for (running != 0) {
+        for (sdl.poll_event(?ev)) {
+            val t: u32 = sdl.event_type(?ev);
+
+            if (t == sdl.EVENT_QUIT) {
+                running = 0;
+            }
+            or (t == sdl.EVENT_KEY_DOWN) {
+                val kb: sdl.KeyboardEvent = sdl.as_keyboard(?ev);
+                if (kb.scancode == sdl.ESCAPE) {
+                    running = 0;
+                }
+            }
+        }
+
+        clear_color(0.15, 0.15, 0.2, 1.0);
+        clear(GL_COLOR_BUFFER_BIT);
+        sdl.swap_window(w);
+    }
+
+    sdl.destroy_context(ctx);
+    sdl.destroy_window(w);
+    sdl.quit();
+    print.println("bye");
+    ret 0;
+}

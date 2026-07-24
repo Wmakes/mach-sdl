@@ -1,0 +1,54 @@
+# event queue polling
+#
+# SDL delivers input through a poll-into-a-struct queue, not callbacks
+# like GLFW -- call poll_event once per loop iteration until it returns
+# false, then check event_type() and pull the specific sub-struct you
+# need (as_keyboard, etc.) for that iteration's event.
+#
+# Event is a 128-byte union; KeyboardEvent is 40. Since they're different
+# sizes, `:~` (bit-reinterpret) doesn't apply -- it only works between
+# same-size types. Instead, reinterpret the *pointer* with `::` (an
+# ordinary pointer-value cast) and dereference to copy out the sub-struct
+# by value.
+
+use sdl.c;
+use std.types.bool.bool;
+
+pub val EVENT_QUIT:     u32 = c.EVENT_QUIT;
+pub val EVENT_KEY_DOWN: u32 = c.EVENT_KEY_DOWN;
+pub val EVENT_KEY_UP:   u32 = c.EVENT_KEY_UP;
+
+# pull the next event off the queue, if any
+# ---
+# event: out-param, filled when this returns true
+# ret:   true if an event was pulled, false if the queue was empty
+pub fun poll_event(event: *c.Event) bool {
+    ret c.SDL_PollEvent(event) != 0;
+}
+
+# the event's type tag -- check this before calling as_keyboard etc.
+# ---
+# event: an event already filled by poll_event
+# ret:   one of the EVENT_* constants (or an SDL event type this binding
+#        doesn't cover yet)
+pub fun event_type(event: *c.Event) u32 {
+    ret (@event).event_type;
+}
+
+# reinterpret a key event as its full KeyboardEvent -- only valid when
+# event_type() is EVENT_KEY_DOWN or EVENT_KEY_UP
+# ---
+# event: an event already filled by poll_event
+# ret:   the KeyboardEvent, copied out by value
+pub fun as_keyboard(event: *c.Event) c.KeyboardEvent {
+    val kb: *c.KeyboardEvent = event::*c.KeyboardEvent;
+    ret @kb;
+}
+
+# whether a KeyboardEvent represents a key going down (vs. up, or a repeat)
+# ---
+# key: a KeyboardEvent from as_keyboard
+# ret: true if this is a fresh key-down (not a held-key repeat)
+pub fun key_is_fresh_press(key: c.KeyboardEvent) bool {
+    ret key.down != 0 && key.repeat == 0;
+}
