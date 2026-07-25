@@ -36,8 +36,34 @@ pub fun get_error() str {
     ret c.SDL_GetError();
 }
 
+# force SDL's headless "dummy" video driver -- call before init().
+#
+# this exists for automated testing without a real display (it's what
+# lets the test blocks below actually call SDL_Init/SDL_CreateWindow for
+# real, not just skip them), but it's genuinely useful outside tests too:
+# any tooling that needs SDL_Init to succeed on a machine with no display
+# server -- headless CI, a build server, a container -- can call this
+# first.
+#
+# note: the dummy driver does NOT support OpenGL. windows created under
+# it work for testing window/event plumbing, but gl.create_context will
+# fail -- that's expected, not a bug. GL-context paths stay demo-only,
+# exercised by actually running main.mach on a real display.
+# ---
+# ret: true on success
+pub fun use_dummy_video_driver() bool {
+    ret c.SDL_SetHint("SDL_VIDEO_DRIVER", "dummy") != 0;
+}
+
 test "core: get_error is non-nil before init" {
     val msg: str = get_error();
     if (msg == nil) { ret 1; }
+    ret 0;
+}
+
+test "core: init/quit round-trip succeeds under the dummy driver" {
+    if (!use_dummy_video_driver()) { ret 1; }
+    if (!init(INIT_VIDEO)) { ret 1; }
+    quit();
     ret 0;
 }

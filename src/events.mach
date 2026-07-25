@@ -12,7 +12,10 @@
 # by value.
 
 use sdl.c;
+use sdl.core;
 use std.types.bool.bool;
+use std.types.bool.true;
+use std.types.bool.false;
 
 pub val EVENT_QUIT:     u32 = c.EVENT_QUIT;
 pub val EVENT_KEY_DOWN: u32 = c.EVENT_KEY_DOWN;
@@ -51,4 +54,45 @@ pub fun as_keyboard(event: *c.Event) c.KeyboardEvent {
 # ret: true if this is a fresh key-down (not a held-key repeat)
 pub fun key_is_fresh_press(key: c.KeyboardEvent) bool {
     ret key.down != 0 && key.repeat == 0;
+}
+
+test "events: key_is_fresh_press distinguishes press, repeat, and release" {
+    # pure logic, no SDL call involved -- constructing the struct by hand
+    var fresh: c.KeyboardEvent;
+    fresh.down   = 1;
+    fresh.repeat = 0;
+    if (!key_is_fresh_press(fresh)) { ret 1; }
+
+    var repeated: c.KeyboardEvent;
+    repeated.down   = 1;
+    repeated.repeat = 1;
+    if (key_is_fresh_press(repeated)) { ret 1; }
+
+    var released: c.KeyboardEvent;
+    released.down   = 0;
+    released.repeat = 0;
+    if (key_is_fresh_press(released)) { ret 1; }
+
+    ret 0;
+}
+
+test "events: poll_event drains without crashing under the dummy driver" {
+    if (!core.use_dummy_video_driver()) { ret 1; }
+    if (!core.init(core.INIT_VIDEO)) { ret 1; }
+
+    var ev: c.Event;
+    var drained: bool = false;
+    var tries: i64 = 0;
+
+    for (tries < 1000) {
+        if (!poll_event(?ev)) {
+            drained = true;
+            brk;
+        }
+        tries = tries + 1;
+    }
+
+    core.quit();
+    if (!drained) { ret 1; }
+    ret 0;
 }

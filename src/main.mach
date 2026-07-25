@@ -1,58 +1,85 @@
-# demo executable for the mach-sdl bindings
+# demo/smoke-test executable for mach-sdl
 #
-# opens a window with an OpenGL context, loads glClearColor/glClear
-# through the context's proc loader, and clears the screen until the
-# window is closed or Escape is pressed.
+# exercises basically the whole current surface in one run:
+#   - core:   init/quit, get_error
+#   - window: create_window (via open_gl_window), destroy_window,
+#             window_is_valid
+#   - gl:     create_context, destroy_context, swap_window,
+#             get_proc_address + :~ cast
+#   - events: poll_event, event_type, as_keyboard, key_is_fresh_press
+#   - key:    W/A/S/D, ESCAPE, SPACE, RETURN, arrow scancodes
 #
-# loads GL functions by hand here, same as mach-glfw's own demo does --
-# wiring this through mach-gl properly (rather than two hand-loaded
-# functions) is follow-up work once this compiles and runs.
+# WASD changes the clear color so you can SEE scancode dispatch working,
+# not just trust it. SPACE/RETURN/arrows print to the terminal so key-up
+# vs key-down vs repeat are all visibly distinguishable. ESCAPE or the
+# window's own close button ends the run cleanly.
 
 use std.runtime;
 use print: std.print;
+use std.types.bool.bool;
+use std.types.string.str;
 use sdl: sdl.sdl;
 
 # glClearColor(red, green, blue, alpha)
 def GlClearColorFun: fun(f32, f32, f32, f32);
 # glClear(mask)
 def GlClearFun: fun(u32);
+# glViewport(x, y, width, height)
+def GlViewportFun: fun(i32, i32, i32, i32);
 
 val GL_COLOR_BUFFER_BIT: u32 = 0x00004000;
+
+fun fail(msg: str) i64 {
+    print.eprint(msg);
+    print.eprint(": ");
+    print.eprintln(sdl.get_error());
+    ret 1;
+}
 
 #[symbol("main")]
 fun main(argc: i64, argv: **u8) i64 {
     if (!sdl.init(sdl.INIT_VIDEO)) {
-        print.eprint("SDL_Init failed: ");
-        print.eprintln(sdl.get_error());
-        ret 1;
+        ret fail("SDL_Init failed");
     }
+    print.println("sdl.init ok");
 
-    val w: sdl.Window = sdl.open_gl_window("mach-sdl", 800, 600);
+    val w: sdl.Window = sdl.open_gl_window("mach-sdl demo", 800, 600);
     if (!sdl.window_is_valid(w)) {
-        print.eprint("SDL_CreateWindow failed: ");
-        print.eprintln(sdl.get_error());
+        val r: i64 = fail("SDL_CreateWindow failed");
         sdl.quit();
-        ret 1;
+        ret r;
     }
+    print.println("window created");
 
     val ctx: ptr = sdl.create_context(w);
     if (ctx == nil) {
-        print.eprint("GL context creation failed: ");
-        print.eprintln(sdl.get_error());
+        val r: i64 = fail("GL context creation failed");
         sdl.destroy_window(w);
         sdl.quit();
-        ret 1;
+        ret r;
     }
+    print.println("gl context created");
 
     val clear_color: GlClearColorFun = sdl.get_proc_address("glClearColor"):~GlClearColorFun;
     val clear: GlClearFun = sdl.get_proc_address("glClear"):~GlClearFun;
-    if (clear_color == nil || clear == nil) {
-        print.eprintln("failed to load GL functions");
+    val viewport: GlViewportFun = sdl.get_proc_address("glViewport"):~GlViewportFun;
+    if (clear_color == nil || clear == nil || viewport == nil) {
+        print.eprintln("failed to load one or more GL functions");
         sdl.destroy_context(ctx);
         sdl.destroy_window(w);
         sdl.quit();
         ret 1;
     }
+    print.println("gl functions loaded");
+    print.println("");
+    print.println("controls: WASD = change clear color, SPACE/RETURN/arrows = print, ESCAPE/close = quit");
+    print.println("");
+
+    viewport(0, 0, 800, 600);
+
+    var r: f32 = 0.15;
+    var g: f32 = 0.15;
+    var b: f32 = 0.20;
 
     var running: u8 = 1;
     var ev: sdl.Event;
@@ -62,17 +89,70 @@ fun main(argc: i64, argv: **u8) i64 {
             val t: u32 = sdl.event_type(?ev);
 
             if (t == sdl.EVENT_QUIT) {
+                print.println("EVENT_QUIT received");
                 running = 0;
             }
             or (t == sdl.EVENT_KEY_DOWN) {
                 val kb: sdl.KeyboardEvent = sdl.as_keyboard(?ev);
+                val fresh: bool = sdl.key_is_fresh_press(kb);
+
                 if (kb.scancode == sdl.ESCAPE) {
+                    print.println("ESCAPE -- quitting");
                     running = 0;
+                }
+                or (kb.scancode == sdl.W) {
+                    b = b + 0.05;
+                    print.println("W -- clear color: more blue");
+                }
+                or (kb.scancode == sdl.S) {
+                    b = b - 0.05;
+                    print.println("S -- clear color: less blue");
+                }
+                or (kb.scancode == sdl.A) {
+                    r = r - 0.05;
+                    print.println("A -- clear color: less red");
+                }
+                or (kb.scancode == sdl.D) {
+                    r = r + 0.05;
+                    print.println("D -- clear color: more red");
+                }
+                or (kb.scancode == sdl.SPACE) {
+                    if (fresh) {
+                        print.println("SPACE down (fresh press)");
+                    } or {
+                        print.println("SPACE down (repeat)");
+                    }
+                }
+                or (kb.scancode == sdl.RETURN) {
+                    print.println("RETURN down");
+                }
+                or (kb.scancode == sdl.UP) {
+                    print.println("UP down");
+                }
+                or (kb.scancode == sdl.DOWN) {
+                    print.println("DOWN down");
+                }
+                or (kb.scancode == sdl.LEFT) {
+                    print.println("LEFT down");
+                }
+                or (kb.scancode == sdl.RIGHT) {
+                    print.println("RIGHT down");
+                }
+            }
+            or (t == sdl.EVENT_KEY_UP) {
+                val kb: sdl.KeyboardEvent = sdl.as_keyboard(?ev);
+                if (kb.scancode == sdl.SPACE) {
+                    print.println("SPACE up");
                 }
             }
         }
 
-        clear_color(0.15, 0.15, 0.2, 1.0);
+        if (r < 0.0) { r = 0.0; }
+        if (r > 1.0) { r = 1.0; }
+        if (b < 0.0) { b = 0.0; }
+        if (b > 1.0) { b = 1.0; }
+
+        clear_color(r, g, b, 1.0);
         clear(GL_COLOR_BUFFER_BIT);
         sdl.swap_window(w);
     }
@@ -80,6 +160,6 @@ fun main(argc: i64, argv: **u8) i64 {
     sdl.destroy_context(ctx);
     sdl.destroy_window(w);
     sdl.quit();
-    print.println("bye");
+    print.println("clean shutdown, bye");
     ret 0;
 }

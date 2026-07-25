@@ -5,6 +5,7 @@
 # window_is_valid and query sdl.core.get_error for the cause.
 
 use sdl.c;
+use sdl.core;
 use std.types.bool.bool;
 use std.types.string.str;
 
@@ -52,4 +53,27 @@ pub fun open_gl_window(title: str, w: i32, h: i32) Window {
 # window: window to destroy
 pub fun destroy_window(window: Window) {
     c.SDL_DestroyWindow(window.handle);
+}
+
+test "window: create_window/destroy_window round-trip under the dummy driver" {
+    if (!core.use_dummy_video_driver()) { ret 1; }
+    if (!core.init(core.INIT_VIDEO)) { ret 1; }
+
+    # no WINDOW_OPENGL here on purpose -- the dummy driver doesn't support
+    # GL, this test is only checking the window/plumbing works, not GL.
+    val w: Window = create_window("mach-sdl test", 320, 240, 0);
+    if (!window_is_valid(w)) {
+        core.quit();
+        ret 1;
+    }
+
+    destroy_window(w);
+    core.quit();
+    ret 0;
+}
+
+test "window: a nil-handle Window reports invalid" {
+    val w: Window = Window{ handle: nil };
+    if (window_is_valid(w)) { ret 1; }
+    ret 0;
 }

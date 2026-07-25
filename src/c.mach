@@ -19,6 +19,12 @@ pub val INIT_EVENTS: u32 = 0x00004000;
 pub ext fun SDL_Init(flags: u32) u8;
 pub ext fun SDL_Quit();
 
+# hints -- SDL_SetHint("SDL_VIDEO_DRIVER", "dummy") forces the headless
+# video driver, which is what makes real (non-display-free) test blocks
+# possible below: no window server needed, but SDL_Init/SDL_CreateWindow/
+# SDL_DestroyWindow all genuinely run, not just get skipped.
+pub ext fun SDL_SetHint(name: *u8, value: *u8) u8;
+
 # --- SDL_error.h ---
 
 pub ext fun SDL_GetError() *u8;
