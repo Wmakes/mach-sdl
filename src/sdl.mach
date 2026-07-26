@@ -1,8 +1,8 @@
 # the flat public surface of the mach-sdl bindings
 #
 # re-exports everything under one namespace so consumers can write
-# `use sdl.sdl;` and reach the whole v1 API as sdl.init(),
-# sdl.open_gl_window(), sdl.poll_event(), and so on. the split modules
+# `use sdl.sdl;` and reach the whole API as sdl.init(), sdl.open_gl_window(),
+# sdl.poll_event(), sdl.new_clock(), and so on. the split modules
 # (sdl.core, sdl.window, ...) remain importable individually.
 #
 # hand-written for now. mach-glfw generates its equivalent file with
@@ -15,15 +15,23 @@ use sdl.window;
 use sdl.events;
 use sdl.key;
 use sdl.gl;
+use sdl.mouse;
+use sdl.timer;
+use sdl.gamepad;
 
 fwd c.Event;
 fwd c.KeyboardEvent;
+fwd c.WindowEvent;
+fwd c.MouseMotionEvent;
+fwd c.MouseButtonEvent;
+fwd c.MouseWheelEvent;
 
 fwd core.INIT_VIDEO;
 fwd core.INIT_EVENTS;
 fwd core.init;
 fwd core.quit;
 fwd core.get_error;
+fwd core.use_dummy_video_driver;
 
 fwd window.Window;
 fwd window.WINDOW_OPENGL;
@@ -36,24 +44,135 @@ fwd window.destroy_window;
 fwd events.EVENT_QUIT;
 fwd events.EVENT_KEY_DOWN;
 fwd events.EVENT_KEY_UP;
+fwd events.EVENT_WINDOW_RESIZED;
+fwd events.EVENT_WINDOW_FOCUS_GAINED;
+fwd events.EVENT_WINDOW_FOCUS_LOST;
+fwd events.EVENT_WINDOW_CLOSE_REQUESTED;
+fwd events.EVENT_MOUSE_MOTION;
+fwd events.EVENT_MOUSE_BUTTON_DOWN;
+fwd events.EVENT_MOUSE_BUTTON_UP;
+fwd events.EVENT_MOUSE_WHEEL;
 fwd events.poll_event;
 fwd events.event_type;
 fwd events.as_keyboard;
+fwd events.as_window;
+fwd events.as_mouse_motion;
+fwd events.as_mouse_button;
+fwd events.as_mouse_wheel;
 fwd events.key_is_fresh_press;
 
 fwd key.A;
+fwd key.B;
+fwd key.C;
 fwd key.D;
+fwd key.E;
+fwd key.F;
+fwd key.G;
+fwd key.H;
+fwd key.I;
+fwd key.J;
+fwd key.K;
+fwd key.L;
+fwd key.M;
+fwd key.N;
+fwd key.O;
+fwd key.P;
+fwd key.Q;
+fwd key.R;
 fwd key.S;
+fwd key.T;
+fwd key.U;
+fwd key.V;
 fwd key.W;
+fwd key.X;
+fwd key.Y;
+fwd key.Z;
+fwd key.NUM_0;
+fwd key.NUM_1;
+fwd key.NUM_2;
+fwd key.NUM_3;
+fwd key.NUM_4;
+fwd key.NUM_5;
+fwd key.NUM_6;
+fwd key.NUM_7;
+fwd key.NUM_8;
+fwd key.NUM_9;
 fwd key.RETURN;
 fwd key.ESCAPE;
+fwd key.BACKSPACE;
+fwd key.TAB;
 fwd key.SPACE;
+fwd key.F1;
+fwd key.F2;
+fwd key.F3;
+fwd key.F4;
+fwd key.F5;
+fwd key.F6;
+fwd key.F7;
+fwd key.F8;
+fwd key.F9;
+fwd key.F10;
+fwd key.F11;
+fwd key.F12;
 fwd key.RIGHT;
 fwd key.LEFT;
 fwd key.DOWN;
 fwd key.UP;
+fwd key.LCTRL;
+fwd key.LSHIFT;
+fwd key.LALT;
+fwd key.RCTRL;
+fwd key.RSHIFT;
+fwd key.RALT;
 
 fwd gl.create_context;
 fwd gl.destroy_context;
 fwd gl.swap_window;
 fwd gl.get_proc_address;
+
+fwd mouse.BUTTON_LEFT;
+fwd mouse.BUTTON_MIDDLE;
+fwd mouse.BUTTON_RIGHT;
+fwd mouse.BUTTON_X1;
+fwd mouse.BUTTON_X2;
+fwd mouse.get_state;
+fwd mouse.warp_in_window;
+fwd mouse.show_cursor;
+fwd mouse.hide_cursor;
+
+fwd timer.ticks_ms;
+fwd timer.ticks_ns;
+fwd timer.delay;
+fwd timer.Clock;
+fwd timer.new_clock;
+fwd timer.tick;
+
+fwd gamepad.Gamepad;
+fwd gamepad.BUTTON_SOUTH;
+fwd gamepad.BUTTON_EAST;
+fwd gamepad.BUTTON_WEST;
+fwd gamepad.BUTTON_NORTH;
+fwd gamepad.BUTTON_BACK;
+fwd gamepad.BUTTON_GUIDE;
+fwd gamepad.BUTTON_START;
+fwd gamepad.BUTTON_LEFT_STICK;
+fwd gamepad.BUTTON_RIGHT_STICK;
+fwd gamepad.BUTTON_LEFT_SHOULDER;
+fwd gamepad.BUTTON_RIGHT_SHOULDER;
+fwd gamepad.BUTTON_DPAD_UP;
+fwd gamepad.BUTTON_DPAD_DOWN;
+fwd gamepad.BUTTON_DPAD_LEFT;
+fwd gamepad.BUTTON_DPAD_RIGHT;
+fwd gamepad.AXIS_LEFTX;
+fwd gamepad.AXIS_LEFTY;
+fwd gamepad.AXIS_RIGHTX;
+fwd gamepad.AXIS_RIGHTY;
+fwd gamepad.AXIS_LEFT_TRIGGER;
+fwd gamepad.AXIS_RIGHT_TRIGGER;
+fwd gamepad.has_gamepad;
+fwd gamepad.gamepad_is_valid;
+fwd gamepad.open_first_gamepad;
+fwd gamepad.close_gamepad;
+fwd gamepad.button;
+fwd gamepad.axis;
+fwd gamepad.axis_normalized;

@@ -1,0 +1,73 @@
+# timing
+#
+# raw millisecond/nanosecond tick counters, a delay function, and Clock --
+# the thing every game loop actually needs: seconds elapsed since the
+# last frame, not a raw counter value you have to convert yourself.
+
+use sdl.c;
+
+# milliseconds since SDL library init
+pub fun ticks_ms() u64 {
+    ret c.SDL_GetTicks();
+}
+
+# nanoseconds since SDL library init -- higher resolution than ticks_ms
+pub fun ticks_ns() u64 {
+    ret c.SDL_GetTicksNS();
+}
+
+# sleep the calling thread
+# ---
+# ms: milliseconds to sleep
+pub fun delay(ms: u32) {
+    c.SDL_Delay(ms);
+}
+
+# a running delta-time clock, backed by the high-resolution performance
+# counter (not ticks_ms -- this is the one you actually want for frame
+# timing, since SDL_GetPerformanceFrequency's units aren't fixed at
+# milliseconds the way SDL_GetTicks's are).
+# ---
+# last: performance-counter value at the last tick() call
+pub rec Clock {
+    last: u64;
+}
+
+# start a clock, timed from right now
+# ---
+# ret: a Clock ready for its first tick() call
+pub fun new_clock() Clock {
+    ret Clock{ last: c.SDL_GetPerformanceCounter() };
+}
+
+# seconds elapsed since this clock's last tick() (or since new_clock(),
+# on the first call) -- call this once per frame and use the result to
+# scale movement/physics so speed doesn't depend on framerate.
+# ---
+# clock: clock to advance
+# ret:   elapsed seconds as f64
+pub fun tick(clock: *Clock) f64 {
+    val now:  u64 = c.SDL_GetPerformanceCounter();
+    val freq: u64 = c.SDL_GetPerformanceFrequency();
+
+    val elapsed: f64 = ((now - (@clock).last)::f64) / (freq::f64);
+    (@clock).last = now;
+    ret elapsed;
+}
+
+test "timer: a fresh clock's first tick is not negative or absurd" {
+    var clk: Clock = new_clock();
+    delay(5);
+    val dt: f64 = tick(?clk);
+    if (dt < 0.0) { ret 1; }
+    if (dt > 5.0) { ret 1; }  # sanity ceiling, not a real timing assertion
+    ret 0;
+}
+
+test "timer: ticks_ms is non-decreasing across a short delay" {
+    val before: u64 = ticks_ms();
+    delay(2);
+    val after: u64 = ticks_ms();
+    if (after < before) { ret 1; }
+    ret 0;
+}

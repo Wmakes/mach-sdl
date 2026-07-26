@@ -1,0 +1,119 @@
+# gamepad input -- poll-based
+#
+# open a gamepad once, then ask it for button/axis state every frame.
+# no event-driven handling yet (connect/disconnect events, button-down/up
+# events) -- deferred until something actually needs it. this covers the
+# common case: one gamepad, queried each tick, same shape as most simple
+# game input code.
+
+use sdl.c;
+use std.types.bool.bool;
+
+pub val BUTTON_SOUTH:          i32 = c.GAMEPAD_BUTTON_SOUTH;
+pub val BUTTON_EAST:           i32 = c.GAMEPAD_BUTTON_EAST;
+pub val BUTTON_WEST:           i32 = c.GAMEPAD_BUTTON_WEST;
+pub val BUTTON_NORTH:          i32 = c.GAMEPAD_BUTTON_NORTH;
+pub val BUTTON_BACK:           i32 = c.GAMEPAD_BUTTON_BACK;
+pub val BUTTON_GUIDE:          i32 = c.GAMEPAD_BUTTON_GUIDE;
+pub val BUTTON_START:          i32 = c.GAMEPAD_BUTTON_START;
+pub val BUTTON_LEFT_STICK:     i32 = c.GAMEPAD_BUTTON_LEFT_STICK;
+pub val BUTTON_RIGHT_STICK:    i32 = c.GAMEPAD_BUTTON_RIGHT_STICK;
+pub val BUTTON_LEFT_SHOULDER:  i32 = c.GAMEPAD_BUTTON_LEFT_SHOULDER;
+pub val BUTTON_RIGHT_SHOULDER: i32 = c.GAMEPAD_BUTTON_RIGHT_SHOULDER;
+pub val BUTTON_DPAD_UP:        i32 = c.GAMEPAD_BUTTON_DPAD_UP;
+pub val BUTTON_DPAD_DOWN:      i32 = c.GAMEPAD_BUTTON_DPAD_DOWN;
+pub val BUTTON_DPAD_LEFT:      i32 = c.GAMEPAD_BUTTON_DPAD_LEFT;
+pub val BUTTON_DPAD_RIGHT:     i32 = c.GAMEPAD_BUTTON_DPAD_RIGHT;
+
+pub val AXIS_LEFTX:         i32 = c.GAMEPAD_AXIS_LEFTX;
+pub val AXIS_LEFTY:         i32 = c.GAMEPAD_AXIS_LEFTY;
+pub val AXIS_RIGHTX:        i32 = c.GAMEPAD_AXIS_RIGHTX;
+pub val AXIS_RIGHTY:        i32 = c.GAMEPAD_AXIS_RIGHTY;
+pub val AXIS_LEFT_TRIGGER:  i32 = c.GAMEPAD_AXIS_LEFT_TRIGGER;
+pub val AXIS_RIGHT_TRIGGER: i32 = c.GAMEPAD_AXIS_RIGHT_TRIGGER;
+
+# handle to an opened gamepad
+# ---
+# handle: opaque SDL_Gamepad pointer, nil when invalid
+pub rec Gamepad {
+    handle: ptr;
+}
+
+# whether at least one gamepad is currently connected
+pub fun has_gamepad() bool {
+    ret c.SDL_HasGamepad() != 0;
+}
+
+# whether a Gamepad holds a live handle
+pub fun gamepad_is_valid(gamepad: Gamepad) bool {
+    ret gamepad.handle != nil;
+}
+
+# open the first connected gamepad, if any
+#
+# for anything wanting to support multiple gamepads by instance ID,
+# sdl.c.SDL_GetGamepads is available directly -- this wrapper only covers
+# the single-player case, which is most of what needs a gamepad at all.
+#
+# KNOWN GAP: SDL_GetGamepads returns a heap-allocated array that SDL's
+# own docs say to free with SDL_free() -- that's not bound yet, so this
+# leaks one small array per call. fine for "call once at startup," not
+# fine if you're calling this in a loop to detect hot-plugged gamepads.
+# ---
+# ret: the opened Gamepad; nil handle if none is connected or open failed
+pub fun open_first_gamepad() Gamepad {
+    var count: i32 = 0;
+    val ids: ptr = c.SDL_GetGamepads(?count);
+    if (ids == nil || count == 0) {
+        ret Gamepad{ handle: nil };
+    }
+
+    val first_id: u32 = @(ids::*u32);
+    ret Gamepad{ handle: c.SDL_OpenGamepad(first_id) };
+}
+
+# close a gamepad
+pub fun close_gamepad(gamepad: Gamepad) {
+    c.SDL_CloseGamepad(gamepad.handle);
+}
+
+# whether a button is currently held down
+# ---
+# gamepad: an opened, valid Gamepad
+# button:  one of the BUTTON_* constants
+pub fun button(gamepad: Gamepad, button: i32) bool {
+    ret c.SDL_GetGamepadButton(gamepad.handle, button) != 0;
+}
+
+# raw axis value
+# ---
+# gamepad: an opened, valid Gamepad
+# axis:    one of the AXIS_* constants
+# ret:     -32768..32767 for sticks; 0..32767 for triggers
+pub fun axis(gamepad: Gamepad, axis: i32) i16 {
+    ret c.SDL_GetGamepadAxis(gamepad.handle, axis);
+}
+
+# axis value normalized to -1.0..1.0 (0.0..1.0 for triggers, which never
+# report negative)
+# ---
+# gamepad: an opened, valid Gamepad
+# axis_id: one of the AXIS_* constants
+pub fun axis_normalized(gamepad: Gamepad, axis_id: i32) f32 {
+    val raw: i16 = axis(gamepad, axis_id);
+    if (raw < 0) {
+        ret (raw::f32) / 32768.0;
+    }
+    ret (raw::f32) / 32767.0;
+}
+
+test "gamepad: has_gamepad does not crash with none connected" {
+    val _unused: bool = has_gamepad();
+    ret 0;
+}
+
+test "gamepad: a nil-handle Gamepad reports invalid" {
+    val g: Gamepad = Gamepad{ handle: nil };
+    if (gamepad_is_valid(g)) { ret 1; }
+    ret 0;
+}

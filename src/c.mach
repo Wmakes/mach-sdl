@@ -7,9 +7,10 @@
 # here and unwrapped with `!= 0` in the idiomatic wrapper modules, the same
 # way mach-glfw unwraps GLFW's int-based booleans in its own core.mach.
 #
-# v1 scope only: init/quit, one window, poll_event, and the GL context
-# functions needed to hand off to mach-gl. audio, renderer, gamepad,
-# haptics, camera, and sensors are all deferred.
+# v2 scope: init/quit, window, GL context, keyboard, mouse, timing, and
+# poll-based gamepad state. still deferred: audio, the 2D renderer,
+# haptics, camera, sensors, and event-driven (as opposed to polled)
+# gamepad button/axis events.
 
 # --- SDL_init.h ---
 
@@ -85,3 +86,157 @@ test "sdl.c: KeyboardEvent layout is 40 bytes" {
     if ($size_of(KeyboardEvent) != 40) { ret 1; }
     ret 0;
 }
+
+# --- window events ---
+
+pub val EVENT_WINDOW_RESIZED:         u32 = 0x206;
+pub val EVENT_WINDOW_FOCUS_GAINED:    u32 = 0x20E;
+pub val EVENT_WINDOW_FOCUS_LOST:      u32 = 0x20F;
+pub val EVENT_WINDOW_CLOSE_REQUESTED: u32 = 0x210;
+
+# SDL_WindowEvent, transcribed field-for-field. type/reserved u32+u32(8),
+# timestamp u64(8), windowID u32(4), data1/data2 i32+i32(8) = 28 bytes,
+# padded to 32 for the embedded u64's 8-byte alignment.
+pub rec WindowEvent {
+    event_type: u32;
+    reserved:   u32;
+    timestamp:  u64;
+    window_id:  u32;
+    data1:      i32;
+    data2:      i32;
+}
+
+test "sdl.c: WindowEvent layout is 32 bytes" {
+    if ($size_of(WindowEvent) != 32) { ret 1; }
+    ret 0;
+}
+
+# --- SDL_mouse.h ---
+
+pub val BUTTON_LEFT:   u8 = 1;
+pub val BUTTON_MIDDLE: u8 = 2;
+pub val BUTTON_RIGHT:  u8 = 3;
+pub val BUTTON_X1:     u8 = 4;
+pub val BUTTON_X2:     u8 = 5;
+
+pub ext fun SDL_GetMouseState(x: *f32, y: *f32) u32;
+pub ext fun SDL_WarpMouseInWindow(window: ptr, x: f32, y: f32);
+pub ext fun SDL_ShowCursor() u8;
+pub ext fun SDL_HideCursor() u8;
+
+pub val EVENT_MOUSE_MOTION:      u32 = 0x400;
+pub val EVENT_MOUSE_BUTTON_DOWN: u32 = 0x401;
+pub val EVENT_MOUSE_BUTTON_UP:   u32 = 0x402;
+pub val EVENT_MOUSE_WHEEL:       u32 = 0x403;
+
+# SDL_MouseMotionEvent: type/reserved(8), timestamp u64(8), windowID(4),
+# which u32(4), state u32(4), x/y/xrel/yrel f32 x4(16) = 44 bytes, padded
+# to 48.
+pub rec MouseMotionEvent {
+    event_type: u32;
+    reserved:   u32;
+    timestamp:  u64;
+    window_id:  u32;
+    which:      u32;
+    state:      u32;
+    x:          f32;
+    y:          f32;
+    xrel:       f32;
+    yrel:       f32;
+}
+
+test "sdl.c: MouseMotionEvent layout is 48 bytes" {
+    if ($size_of(MouseMotionEvent) != 48) { ret 1; }
+    ret 0;
+}
+
+# SDL_MouseButtonEvent: type/reserved(8), timestamp u64(8), windowID(4),
+# which u32(4), button/down/clicks/padding u8 x4(4), x/y f32 x2(8) =
+# 36 bytes, padded to 40.
+pub rec MouseButtonEvent {
+    event_type: u32;
+    reserved:   u32;
+    timestamp:  u64;
+    window_id:  u32;
+    which:      u32;
+    button:     u8;
+    down:       u8;
+    clicks:     u8;
+    _pad:       u8;
+    x:          f32;
+    y:          f32;
+}
+
+test "sdl.c: MouseButtonEvent layout is 40 bytes" {
+    if ($size_of(MouseButtonEvent) != 40) { ret 1; }
+    ret 0;
+}
+
+# SDL_MouseWheelEvent: type/reserved(8), timestamp u64(8), windowID(4),
+# which u32(4), x/y f32 x2(8), direction i32(4), mouse_x/mouse_y f32 x2(8)
+# = 44 bytes, padded to 48.
+pub rec MouseWheelEvent {
+    event_type: u32;
+    reserved:   u32;
+    timestamp:  u64;
+    window_id:  u32;
+    which:      u32;
+    x:          f32;
+    y:          f32;
+    direction:  i32;
+    mouse_x:    f32;
+    mouse_y:    f32;
+}
+
+test "sdl.c: MouseWheelEvent layout is 48 bytes" {
+    if ($size_of(MouseWheelEvent) != 48) { ret 1; }
+    ret 0;
+}
+
+# --- SDL_timer.h ---
+#
+# no structs here -- every function is a plain scalar in, scalar out, so
+# there's nothing to get an ABI layout wrong on.
+
+pub ext fun SDL_GetTicks() u64;
+pub ext fun SDL_GetTicksNS() u64;
+pub ext fun SDL_GetPerformanceCounter() u64;
+pub ext fun SDL_GetPerformanceFrequency() u64;
+pub ext fun SDL_Delay(ms: u32);
+
+# --- SDL_gamepad.h / SDL_joystick.h ---
+#
+# poll-based only: open a gamepad, ask it for button/axis state each
+# frame. no event-driven gamepad handling (button-down/up/connect events)
+# yet -- deferred, same reasoning as everywhere else in this file: add it
+# when something actually needs it.
+
+pub ext fun SDL_HasGamepad() u8;
+pub ext fun SDL_GetGamepads(count: *i32) ptr;
+pub ext fun SDL_OpenGamepad(instance_id: u32) ptr;
+pub ext fun SDL_CloseGamepad(gamepad: ptr);
+pub ext fun SDL_GetGamepadButton(gamepad: ptr, button: i32) u8;
+pub ext fun SDL_GetGamepadAxis(gamepad: ptr, axis: i32) i16;
+
+pub val GAMEPAD_BUTTON_SOUTH:          i32 = 0;
+pub val GAMEPAD_BUTTON_EAST:           i32 = 1;
+pub val GAMEPAD_BUTTON_WEST:           i32 = 2;
+pub val GAMEPAD_BUTTON_NORTH:          i32 = 3;
+pub val GAMEPAD_BUTTON_BACK:           i32 = 4;
+pub val GAMEPAD_BUTTON_GUIDE:          i32 = 5;
+pub val GAMEPAD_BUTTON_START:          i32 = 6;
+pub val GAMEPAD_BUTTON_LEFT_STICK:     i32 = 7;
+pub val GAMEPAD_BUTTON_RIGHT_STICK:    i32 = 8;
+pub val GAMEPAD_BUTTON_LEFT_SHOULDER:  i32 = 9;
+pub val GAMEPAD_BUTTON_RIGHT_SHOULDER: i32 = 10;
+pub val GAMEPAD_BUTTON_DPAD_UP:        i32 = 11;
+pub val GAMEPAD_BUTTON_DPAD_DOWN:      i32 = 12;
+pub val GAMEPAD_BUTTON_DPAD_LEFT:      i32 = 13;
+pub val GAMEPAD_BUTTON_DPAD_RIGHT:     i32 = 14;
+
+pub val GAMEPAD_AXIS_LEFTX:         i32 = 0;
+pub val GAMEPAD_AXIS_LEFTY:         i32 = 1;
+pub val GAMEPAD_AXIS_RIGHTX:        i32 = 2;
+pub val GAMEPAD_AXIS_RIGHTY:        i32 = 3;
+pub val GAMEPAD_AXIS_LEFT_TRIGGER:  i32 = 4;
+pub val GAMEPAD_AXIS_RIGHT_TRIGGER: i32 = 5;

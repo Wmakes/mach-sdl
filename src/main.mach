@@ -1,18 +1,19 @@
 # demo/smoke-test executable for mach-sdl
 #
-# exercises basically the whole current surface in one run:
-#   - core:   init/quit, get_error
-#   - window: create_window (via open_gl_window), destroy_window,
-#             window_is_valid
-#   - gl:     create_context, destroy_context, swap_window,
-#             get_proc_address + :~ cast
-#   - events: poll_event, event_type, as_keyboard, key_is_fresh_press
-#   - key:    W/A/S/D, ESCAPE, SPACE, RETURN, arrow scancodes
+# exercises the v2 surface:
+#   - core/window/gl: same as before -- init, window, GL context
+#   - events: keyboard (WASD/escape), mouse motion + click, window resize
+#   - timer:  a real Clock driving delta-time movement, not just a frame
+#             counter -- this is the actual point of timer.mach
+#   - gamepad: detected and reported if one's connected, not required
 #
-# WASD changes the clear color so you can SEE scancode dispatch working,
-# not just trust it. SPACE/RETURN/arrows print to the terminal so key-up
-# vs key-down vs repeat are all visibly distinguishable. ESCAPE or the
-# window's own close button ends the run cleanly.
+# a real orange square, drawn with legacy immediate-mode GL (glBegin/
+# glVertex2f/glColor3f -- no shader/VBO setup needed), moves at a fixed
+# speed in units/sec controlled by WASD. position is also printed roughly
+# twice a second so delta-time can be sanity-checked against the visual
+# motion. depends on a compatibility-profile GL context; if the driver
+# hands back a strict core profile, GL function loading below will fail
+# and say so rather than silently drawing nothing.
 
 use std.runtime;
 use print: std.print;
@@ -20,14 +21,25 @@ use std.types.bool.bool;
 use std.types.string.str;
 use sdl: sdl.sdl;
 
-# glClearColor(red, green, blue, alpha)
 def GlClearColorFun: fun(f32, f32, f32, f32);
-# glClear(mask)
 def GlClearFun: fun(u32);
-# glViewport(x, y, width, height)
 def GlViewportFun: fun(i32, i32, i32, i32);
+# legacy immediate-mode drawing -- no shader/VBO setup needed, but
+# depends on getting a compatibility-profile GL context (see the note
+# where these get loaded, below).
+def GlMatrixModeFun: fun(u32);
+def GlLoadIdentityFun: fun();
+def GlOrthoFun: fun(f64, f64, f64, f64, f64, f64);
+def GlBeginFun: fun(u32);
+def GlEndFun: fun();
+def GlVertex2fFun: fun(f32, f32);
+def GlColor3fFun: fun(f32, f32, f32);
 
 val GL_COLOR_BUFFER_BIT: u32 = 0x00004000;
+val GL_PROJECTION:       u32 = 0x1701;
+val GL_MODELVIEW:        u32 = 0x1700;
+val GL_QUADS:            u32 = 0x0007;
+val MOVE_SPEED: f32 = 200.0;  # units per second
 
 fun fail(msg: str) i64 {
     print.eprint(msg);
@@ -41,7 +53,6 @@ fun main(argc: i64, argv: **u8) i64 {
     if (!sdl.init(sdl.INIT_VIDEO)) {
         ret fail("SDL_Init failed");
     }
-    print.println("sdl.init ok");
 
     val w: sdl.Window = sdl.open_gl_window("mach-sdl demo", 800, 600);
     if (!sdl.window_is_valid(w)) {
@@ -49,7 +60,6 @@ fun main(argc: i64, argv: **u8) i64 {
         sdl.quit();
         ret r;
     }
-    print.println("window created");
 
     val ctx: ptr = sdl.create_context(w);
     if (ctx == nil) {
@@ -58,29 +68,61 @@ fun main(argc: i64, argv: **u8) i64 {
         sdl.quit();
         ret r;
     }
-    print.println("gl context created");
 
     val clear_color: GlClearColorFun = sdl.get_proc_address("glClearColor"):~GlClearColorFun;
     val clear: GlClearFun = sdl.get_proc_address("glClear"):~GlClearFun;
     val viewport: GlViewportFun = sdl.get_proc_address("glViewport"):~GlViewportFun;
-    if (clear_color == nil || clear == nil || viewport == nil) {
-        print.eprintln("failed to load one or more GL functions");
+    val matrix_mode: GlMatrixModeFun = sdl.get_proc_address("glMatrixMode"):~GlMatrixModeFun;
+    val load_identity: GlLoadIdentityFun = sdl.get_proc_address("glLoadIdentity"):~GlLoadIdentityFun;
+    val ortho: GlOrthoFun = sdl.get_proc_address("glOrtho"):~GlOrthoFun;
+    val gl_begin: GlBeginFun = sdl.get_proc_address("glBegin"):~GlBeginFun;
+    val gl_end: GlEndFun = sdl.get_proc_address("glEnd"):~GlEndFun;
+    val vertex2f: GlVertex2fFun = sdl.get_proc_address("glVertex2f"):~GlVertex2fFun;
+    val color3f: GlColor3fFun = sdl.get_proc_address("glColor3f"):~GlColor3fFun;
+    if (clear_color == nil || clear == nil || viewport == nil || matrix_mode == nil
+                            || load_identity == nil || ortho == nil || gl_begin == nil
+                            || gl_end == nil || vertex2f == nil || color3f == nil) {
+        print.eprintln("failed to load one or more GL functions -- likely a core-profile context that doesn't expose the legacy immediate-mode API");
         sdl.destroy_context(ctx);
         sdl.destroy_window(w);
         sdl.quit();
         ret 1;
     }
-    print.println("gl functions loaded");
-    print.println("");
-    print.println("controls: WASD = change clear color, SPACE/RETURN/arrows = print, ESCAPE/close = quit");
-    print.println("");
-
     viewport(0, 0, 800, 600);
 
-    var r: f32 = 0.15;
-    var g: f32 = 0.15;
-    var b: f32 = 0.20;
+    # top-left origin, y increasing downward, matching the (px, py)
+    # coordinates already being tracked/printed
+    matrix_mode(GL_PROJECTION);
+    load_identity();
+    ortho(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
+    matrix_mode(GL_MODELVIEW);
 
+    if (sdl.has_gamepad()) {
+        val gp: sdl.Gamepad = sdl.open_first_gamepad();
+        if (sdl.gamepad_is_valid(gp)) {
+            print.println("gamepad connected");
+        } or {
+            print.println("gamepad detected but failed to open");
+        }
+    } or {
+        print.println("no gamepad connected (fine -- keyboard/mouse still work)");
+    }
+
+    print.println("");
+    print.println("controls: WASD = move the square, ESCAPE/close = quit");
+    print.println("mouse clicks and window resizes print below as they happen");
+    print.println("");
+
+    var px: f32 = 400.0;
+    var py: f32 = 300.0;
+
+    var move_up:    u8 = 0;
+    var move_down:  u8 = 0;
+    var move_left:  u8 = 0;
+    var move_right: u8 = 0;
+
+    var clk: sdl.Clock = sdl.new_clock();
+    var print_accum: f64 = 0.0;
     var running: u8 = 1;
     var ev: sdl.Event;
 
@@ -89,71 +131,60 @@ fun main(argc: i64, argv: **u8) i64 {
             val t: u32 = sdl.event_type(?ev);
 
             if (t == sdl.EVENT_QUIT) {
-                print.println("EVENT_QUIT received");
                 running = 0;
             }
             or (t == sdl.EVENT_KEY_DOWN) {
                 val kb: sdl.KeyboardEvent = sdl.as_keyboard(?ev);
-                val fresh: bool = sdl.key_is_fresh_press(kb);
-
-                if (kb.scancode == sdl.ESCAPE) {
-                    print.println("ESCAPE -- quitting");
-                    running = 0;
-                }
-                or (kb.scancode == sdl.W) {
-                    b = b + 0.05;
-                    print.println("W -- clear color: more blue");
-                }
-                or (kb.scancode == sdl.S) {
-                    b = b - 0.05;
-                    print.println("S -- clear color: less blue");
-                }
-                or (kb.scancode == sdl.A) {
-                    r = r - 0.05;
-                    print.println("A -- clear color: less red");
-                }
-                or (kb.scancode == sdl.D) {
-                    r = r + 0.05;
-                    print.println("D -- clear color: more red");
-                }
-                or (kb.scancode == sdl.SPACE) {
-                    if (fresh) {
-                        print.println("SPACE down (fresh press)");
-                    } or {
-                        print.println("SPACE down (repeat)");
-                    }
-                }
-                or (kb.scancode == sdl.RETURN) {
-                    print.println("RETURN down");
-                }
-                or (kb.scancode == sdl.UP) {
-                    print.println("UP down");
-                }
-                or (kb.scancode == sdl.DOWN) {
-                    print.println("DOWN down");
-                }
-                or (kb.scancode == sdl.LEFT) {
-                    print.println("LEFT down");
-                }
-                or (kb.scancode == sdl.RIGHT) {
-                    print.println("RIGHT down");
-                }
+                if (kb.scancode == sdl.ESCAPE) { running = 0; }
+                or (kb.scancode == sdl.W) { move_up = 1; }
+                or (kb.scancode == sdl.S) { move_down = 1; }
+                or (kb.scancode == sdl.A) { move_left = 1; }
+                or (kb.scancode == sdl.D) { move_right = 1; }
             }
             or (t == sdl.EVENT_KEY_UP) {
                 val kb: sdl.KeyboardEvent = sdl.as_keyboard(?ev);
-                if (kb.scancode == sdl.SPACE) {
-                    print.println("SPACE up");
-                }
+                if (kb.scancode == sdl.W) { move_up = 0; }
+                or (kb.scancode == sdl.S) { move_down = 0; }
+                or (kb.scancode == sdl.A) { move_left = 0; }
+                or (kb.scancode == sdl.D) { move_right = 0; }
+            }
+            or (t == sdl.EVENT_MOUSE_BUTTON_DOWN) {
+                val mb: sdl.MouseButtonEvent = sdl.as_mouse_button(?ev);
+                print.printf("mouse button {} down at ({}, {})\n", mb.button, mb.x::i64, mb.y::i64);
+            }
+            or (t == sdl.EVENT_WINDOW_RESIZED) {
+                val we: sdl.WindowEvent = sdl.as_window(?ev);
+                print.printf("window resized to {}x{}\n", we.data1, we.data2);
+                viewport(0, 0, we.data1, we.data2);
             }
         }
 
-        if (r < 0.0) { r = 0.0; }
-        if (r > 1.0) { r = 1.0; }
-        if (b < 0.0) { b = 0.0; }
-        if (b > 1.0) { b = 1.0; }
+        val dt: f64 = sdl.tick(?clk);
+        val dist: f32 = MOVE_SPEED * (dt::f32);
 
-        clear_color(r, g, b, 1.0);
+        if (move_up   != 0) { py = py - dist; }
+        if (move_down  != 0) { py = py + dist; }
+        if (move_left  != 0) { px = px - dist; }
+        if (move_right != 0) { px = px + dist; }
+
+        print_accum = print_accum + dt;
+        if (print_accum >= 0.5) {
+            print.printf("square at ({}, {})\n", px::i64, py::i64);
+            print_accum = 0.0;
+        }
+
+        clear_color(0.12, 0.12, 0.16, 1.0);
         clear(GL_COLOR_BUFFER_BIT);
+
+        val half: f32 = 20.0;
+        color3f(0.9, 0.4, 0.2);
+        gl_begin(GL_QUADS);
+        vertex2f(px - half, py - half);
+        vertex2f(px + half, py - half);
+        vertex2f(px + half, py + half);
+        vertex2f(px - half, py + half);
+        gl_end();
+
         sdl.swap_window(w);
     }
 

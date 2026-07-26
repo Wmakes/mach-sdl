@@ -21,6 +21,16 @@ pub val EVENT_QUIT:     u32 = c.EVENT_QUIT;
 pub val EVENT_KEY_DOWN: u32 = c.EVENT_KEY_DOWN;
 pub val EVENT_KEY_UP:   u32 = c.EVENT_KEY_UP;
 
+pub val EVENT_WINDOW_RESIZED:         u32 = c.EVENT_WINDOW_RESIZED;
+pub val EVENT_WINDOW_FOCUS_GAINED:    u32 = c.EVENT_WINDOW_FOCUS_GAINED;
+pub val EVENT_WINDOW_FOCUS_LOST:      u32 = c.EVENT_WINDOW_FOCUS_LOST;
+pub val EVENT_WINDOW_CLOSE_REQUESTED: u32 = c.EVENT_WINDOW_CLOSE_REQUESTED;
+
+pub val EVENT_MOUSE_MOTION:      u32 = c.EVENT_MOUSE_MOTION;
+pub val EVENT_MOUSE_BUTTON_DOWN: u32 = c.EVENT_MOUSE_BUTTON_DOWN;
+pub val EVENT_MOUSE_BUTTON_UP:   u32 = c.EVENT_MOUSE_BUTTON_UP;
+pub val EVENT_MOUSE_WHEEL:       u32 = c.EVENT_MOUSE_WHEEL;
+
 # pull the next event off the queue, if any
 # ---
 # event: out-param, filled when this returns true
@@ -46,6 +56,45 @@ pub fun event_type(event: *c.Event) u32 {
 pub fun as_keyboard(event: *c.Event) c.KeyboardEvent {
     val kb: *c.KeyboardEvent = event::*c.KeyboardEvent;
     ret @kb;
+}
+
+# reinterpret a window event -- valid for any EVENT_WINDOW_* type
+# ---
+# event: an event already filled by poll_event
+# ret:   the WindowEvent, copied out by value
+pub fun as_window(event: *c.Event) c.WindowEvent {
+    val w: *c.WindowEvent = event::*c.WindowEvent;
+    ret @w;
+}
+
+# reinterpret a mouse motion event -- only valid when event_type() is
+# EVENT_MOUSE_MOTION
+# ---
+# event: an event already filled by poll_event
+# ret:   the MouseMotionEvent, copied out by value
+pub fun as_mouse_motion(event: *c.Event) c.MouseMotionEvent {
+    val m: *c.MouseMotionEvent = event::*c.MouseMotionEvent;
+    ret @m;
+}
+
+# reinterpret a mouse button event -- only valid when event_type() is
+# EVENT_MOUSE_BUTTON_DOWN or EVENT_MOUSE_BUTTON_UP
+# ---
+# event: an event already filled by poll_event
+# ret:   the MouseButtonEvent, copied out by value
+pub fun as_mouse_button(event: *c.Event) c.MouseButtonEvent {
+    val m: *c.MouseButtonEvent = event::*c.MouseButtonEvent;
+    ret @m;
+}
+
+# reinterpret a mouse wheel event -- only valid when event_type() is
+# EVENT_MOUSE_WHEEL
+# ---
+# event: an event already filled by poll_event
+# ret:   the MouseWheelEvent, copied out by value
+pub fun as_mouse_wheel(event: *c.Event) c.MouseWheelEvent {
+    val m: *c.MouseWheelEvent = event::*c.MouseWheelEvent;
+    ret @m;
 }
 
 # whether a KeyboardEvent represents a key going down (vs. up, or a repeat)

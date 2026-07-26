@@ -1,0 +1,45 @@
+# mouse position, buttons, cursor visibility
+#
+# mach-idiomatic wrappers over sdl.c's SDL_mouse.h imports. get_state()
+# returns a bitmask, not a button index -- test a specific button with
+# `(mask & (1 << (BUTTON_LEFT - 1))) != 0`, not `mask == BUTTON_LEFT`.
+
+use sdl.c;
+use std.types.bool.bool;
+
+pub val BUTTON_LEFT:   u8 = c.BUTTON_LEFT;
+pub val BUTTON_MIDDLE: u8 = c.BUTTON_MIDDLE;
+pub val BUTTON_RIGHT:  u8 = c.BUTTON_RIGHT;
+pub val BUTTON_X1:     u8 = c.BUTTON_X1;
+pub val BUTTON_X2:     u8 = c.BUTTON_X2;
+
+# current mouse position (relative to the focused window) and button mask
+# ---
+# x: out-param, x position
+# y: out-param, y position
+# ret: bitmask -- test with e.g. `(mask & (1 << (BUTTON_LEFT - 1))) != 0`
+pub fun get_state(x: *f32, y: *f32) u32 {
+    ret c.SDL_GetMouseState(x, y);
+}
+
+# move the mouse to a position relative to a window
+# ---
+# window: window handle (ptr, as stored in sdl.window.Window.handle)
+# x, y:   target position, relative to the window
+pub fun warp_in_window(window: ptr, x: f32, y: f32) {
+    c.SDL_WarpMouseInWindow(window, x, y);
+}
+
+# show the system cursor
+# ---
+# ret: true on success
+pub fun show_cursor() bool {
+    ret c.SDL_ShowCursor() != 0;
+}
+
+# hide the system cursor
+# ---
+# ret: true on success
+pub fun hide_cursor() bool {
+    ret c.SDL_HideCursor() != 0;
+}

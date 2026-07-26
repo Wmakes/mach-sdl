@@ -6,21 +6,75 @@
 # you want the same physical key regardless of layout (WASD stays under
 # the left hand on an AZERTY board, for instance). use `key` (the
 # SDL_Keycode) instead when you care what character the user's layout
-# actually produces.
+# actually produces -- not bound yet, add it if something needs it.
 #
-# only the subset actually needed for a game loop so far -- add more as
-# needed, transcribing straight from SDL_scancode.h, not from memory.
+# transcribed straight from SDL_scancode.h, tag release-3.2.0.
 
 pub val A: u32 = 4;
+pub val B: u32 = 5;
+pub val C: u32 = 6;
 pub val D: u32 = 7;
+pub val E: u32 = 8;
+pub val F: u32 = 9;
+pub val G: u32 = 10;
+pub val H: u32 = 11;
+pub val I: u32 = 12;
+pub val J: u32 = 13;
+pub val K: u32 = 14;
+pub val L: u32 = 15;
+pub val M: u32 = 16;
+pub val N: u32 = 17;
+pub val O: u32 = 18;
+pub val P: u32 = 19;
+pub val Q: u32 = 20;
+pub val R: u32 = 21;
 pub val S: u32 = 22;
+pub val T: u32 = 23;
+pub val U: u32 = 24;
+pub val V: u32 = 25;
 pub val W: u32 = 26;
+pub val X: u32 = 27;
+pub val Y: u32 = 28;
+pub val Z: u32 = 29;
 
-pub val RETURN: u32 = 40;
-pub val ESCAPE: u32 = 41;
-pub val SPACE:  u32 = 44;
+pub val NUM_1: u32 = 30;
+pub val NUM_2: u32 = 31;
+pub val NUM_3: u32 = 32;
+pub val NUM_4: u32 = 33;
+pub val NUM_5: u32 = 34;
+pub val NUM_6: u32 = 35;
+pub val NUM_7: u32 = 36;
+pub val NUM_8: u32 = 37;
+pub val NUM_9: u32 = 38;
+pub val NUM_0: u32 = 39;
+
+pub val RETURN:    u32 = 40;
+pub val ESCAPE:    u32 = 41;
+pub val BACKSPACE: u32 = 42;
+pub val TAB:       u32 = 43;
+pub val SPACE:     u32 = 44;
+
+pub val F1:  u32 = 58;
+pub val F2:  u32 = 59;
+pub val F3:  u32 = 60;
+pub val F4:  u32 = 61;
+pub val F5:  u32 = 62;
+pub val F6:  u32 = 63;
+pub val F7:  u32 = 64;
+pub val F8:  u32 = 65;
+pub val F9:  u32 = 66;
+pub val F10: u32 = 67;
+pub val F11: u32 = 68;
+pub val F12: u32 = 69;
 
 pub val RIGHT: u32 = 79;
 pub val LEFT:  u32 = 80;
 pub val DOWN:  u32 = 81;
 pub val UP:    u32 = 82;
+
+pub val LCTRL:  u32 = 224;
+pub val LSHIFT: u32 = 225;
+pub val LALT:   u32 = 226;
+pub val RCTRL:  u32 = 228;
+pub val RSHIFT: u32 = 229;
+pub val RALT:   u32 = 230;
