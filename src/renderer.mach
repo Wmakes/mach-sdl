@@ -1,0 +1,172 @@
+# 2D rendering via SDL's own renderer
+#
+# an alternative to sdl.gl for simple 2D drawing -- clear/fill-rect/
+# present, no GL proc loading, no immediate-mode/core-profile questions.
+# use this OR gl.mach for a given window, not both: SDL_CreateRenderer
+# and SDL_GL_CreateContext both claim the window's drawable surface.
+#
+# unlike GL, this genuinely works under the headless dummy video driver
+# (SDL picks a software backend), so unlike gl.mach's functions, the
+# round-trip here gets a real functional test, not just a demo.
+
+use sdl.c;
+use sdl.core;
+use sdl.window.Window;
+use std.types.bool.bool;
+use std.types.string.str;
+
+# create a renderer for a window
+# ---
+# window: window to attach the renderer to
+# ret:    the renderer handle, or nil on failure -- check core.get_error()
+pub fun create_renderer(window: Window) ptr {
+    ret c.SDL_CreateRenderer(window.handle, nil);
+}
+
+# destroy a renderer
+pub fun destroy_renderer(renderer: ptr) {
+    c.SDL_DestroyRenderer(renderer);
+}
+
+# set the color used by clear/fill/line/point calls until changed again
+pub fun set_draw_color(renderer: ptr, r: u8, g: u8, b: u8, a: u8) bool {
+    ret c.SDL_SetRenderDrawColor(renderer, r, g, b, a) != 0;
+}
+
+# clear the current render target to the current draw color
+pub fun clear(renderer: ptr) bool {
+    ret c.SDL_RenderClear(renderer) != 0;
+}
+
+# fill a rectangle with the current draw color
+pub fun fill_rect(renderer: ptr, rect: c.FRect) bool {
+    ret c.SDL_RenderFillRect(renderer, ?rect) != 0;
+}
+
+# outline a rectangle with the current draw color
+pub fun draw_rect(renderer: ptr, rect: c.FRect) bool {
+    ret c.SDL_RenderRect(renderer, ?rect) != 0;
+}
+
+# draw a line with the current draw color
+pub fun draw_line(renderer: ptr, x1: f32, y1: f32, x2: f32, y2: f32) bool {
+    ret c.SDL_RenderLine(renderer, x1, y1, x2, y2) != 0;
+}
+
+# present everything drawn since the last clear
+pub fun present(renderer: ptr) bool {
+    ret c.SDL_RenderPresent(renderer) != 0;
+}
+
+# load an image file straight into a texture for this renderer -- combines
+# SDL_LoadBMP + SDL_CreateTextureFromSurface + SDL_DestroySurface into one
+# call, since the intermediate surface has no use once the texture exists.
+#
+# only BMP is supported (SDL_LoadBMP is all that's bound here) -- other
+# formats need SDL_image, a separate library not bound in this project.
+# ---
+# renderer: renderer to create the texture for
+# path:     path to a .bmp file
+# ret:      the texture handle, or nil on failure -- check core.get_error()
+pub fun load_texture(renderer: ptr, path: str) ptr {
+    val surface: ptr = c.SDL_LoadBMP(path);
+    if (surface == nil) { ret nil; }
+
+    val texture: ptr = c.SDL_CreateTextureFromSurface(renderer, surface);
+    c.SDL_DestroySurface(surface);
+    ret texture;
+}
+
+# destroy a texture
+pub fun destroy_texture(texture: ptr) {
+    c.SDL_DestroyTexture(texture);
+}
+
+# plain width/height pair, in pixels, as floats (textures report float
+# dimensions even though they're pixel-aligned in practice)
+pub rec FSize {
+    w: f32;
+    h: f32;
+}
+
+# a texture's width/height in pixels
+# ---
+# texture: texture to query
+# ret:     (w, h) -- (0.0, 0.0) if the query fails
+pub fun texture_size(texture: ptr) FSize {
+    var w: f32 = 0.0;
+    var h: f32 = 0.0;
+    c.SDL_GetTextureSize(texture, ?w, ?h);
+    ret FSize{ w: w, h: h };
+}
+
+# draw a texture, scaled to fill dst_rect
+# ---
+# renderer: renderer to draw with
+# texture:  texture to draw
+# dst_rect: destination rectangle in the renderer's coordinate space --
+#           the whole texture is stretched/shrunk to fit it
+pub fun draw_texture(renderer: ptr, texture: ptr, dst_rect: c.FRect) bool {
+    ret c.SDL_RenderTexture(renderer, texture, nil, ?dst_rect) != 0;
+}
+
+test "renderer: create/clear/present/destroy round-trip under the dummy driver" {
+    if (!core.use_dummy_video_driver()) { ret 1; }
+    if (!core.init(core.INIT_VIDEO)) { ret 1; }
+
+    val win: ptr = c.SDL_CreateWindow("renderer test", 64, 64, 0);
+    if (win == nil) {
+        core.quit();
+        ret 1;
+    }
+    val win_rec: Window = Window{ handle: win };
+
+    val r: ptr = create_renderer(win_rec);
+    if (r == nil) {
+        c.SDL_DestroyWindow(win);
+        core.quit();
+        ret 1;
+    }
+
+    var ok: bool = set_draw_color(r, 0, 0, 0, 255);
+    ok = ok && clear(r);
+
+    val rect: c.FRect = c.FRect{ x: 0.0, y: 0.0, w: 10.0, h: 10.0 };
+    ok = ok && fill_rect(r, rect);
+    ok = ok && present(r);
+
+    destroy_renderer(r);
+    c.SDL_DestroyWindow(win);
+    core.quit();
+
+    if (!ok) { ret 1; }
+    ret 0;
+}
+
+test "renderer: load_texture on a nonexistent file fails cleanly (no crash)" {
+    if (!core.use_dummy_video_driver()) { ret 1; }
+    if (!core.init(core.INIT_VIDEO)) { ret 1; }
+
+    val win: ptr = c.SDL_CreateWindow("texture test", 64, 64, 0);
+    if (win == nil) {
+        core.quit();
+        ret 1;
+    }
+    val win_rec: Window = Window{ handle: win };
+
+    val r: ptr = create_renderer(win_rec);
+    if (r == nil) {
+        c.SDL_DestroyWindow(win);
+        core.quit();
+        ret 1;
+    }
+
+    val tex: ptr = load_texture(r, "this-file-does-not-exist.bmp");
+
+    destroy_renderer(r);
+    c.SDL_DestroyWindow(win);
+    core.quit();
+
+    if (tex != nil) { ret 1; }  # should have failed, not succeeded
+    ret 0;
+}

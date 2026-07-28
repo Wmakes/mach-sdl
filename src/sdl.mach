@@ -1,13 +1,11 @@
 # the flat public surface of the mach-sdl bindings
 #
 # re-exports everything under one namespace so consumers can write
-# `use sdl.sdl;` and reach the whole API as sdl.init(), sdl.open_gl_window(),
-# sdl.poll_event(), sdl.new_clock(), and so on. the split modules
-# (sdl.core, sdl.window, ...) remain importable individually.
-#
-# hand-written for now. mach-glfw generates its equivalent file with
-# tools/surface.sh -- worth adopting the same tooling here once this
-# surface stabilizes, so it can't drift out of sync by hand.
+# `use sdl: sdl.sdl;` and reach the whole API as sdl.init(),
+# sdl.open_gl_window(), sdl.poll_event(), sdl.new_clock(), etc.
+# the split modules (sdl.core, sdl.window, ...) remain importable
+# individually for a smaller dependency surface if you don't need
+# the whole thing.
 
 use sdl.c;
 use sdl.core;
@@ -18,29 +16,47 @@ use sdl.gl;
 use sdl.mouse;
 use sdl.timer;
 use sdl.gamepad;
+use sdl.renderer;
+use sdl.audio;
+use sdl.rect;
+use sdl.rand;
+use sdl.msgbox;
 
+# --- raw types (re-exported so consumers don't need to import sdl.c) ---
 fwd c.Event;
 fwd c.KeyboardEvent;
 fwd c.WindowEvent;
 fwd c.MouseMotionEvent;
 fwd c.MouseButtonEvent;
 fwd c.MouseWheelEvent;
+fwd c.FRect;
+fwd c.AudioSpec;
 
+# --- core ---
 fwd core.INIT_VIDEO;
+fwd core.INIT_AUDIO;
 fwd core.INIT_EVENTS;
 fwd core.init;
 fwd core.quit;
 fwd core.get_error;
 fwd core.use_dummy_video_driver;
+fwd core.use_dummy_audio_driver;
 
+# --- window ---
 fwd window.Window;
+fwd window.Size;
 fwd window.WINDOW_OPENGL;
 fwd window.WINDOW_RESIZABLE;
 fwd window.window_is_valid;
 fwd window.create_window;
 fwd window.open_gl_window;
 fwd window.destroy_window;
+fwd window.set_title;
+fwd window.get_size;
+fwd window.set_position;
+fwd window.set_fullscreen;
 
+# --- events ---
 fwd events.EVENT_QUIT;
 fwd events.EVENT_KEY_DOWN;
 fwd events.EVENT_KEY_UP;
@@ -61,85 +77,38 @@ fwd events.as_mouse_button;
 fwd events.as_mouse_wheel;
 fwd events.key_is_fresh_press;
 
-fwd key.A;
-fwd key.B;
-fwd key.C;
-fwd key.D;
-fwd key.E;
-fwd key.F;
-fwd key.G;
-fwd key.H;
-fwd key.I;
-fwd key.J;
-fwd key.K;
-fwd key.L;
-fwd key.M;
-fwd key.N;
-fwd key.O;
-fwd key.P;
-fwd key.Q;
-fwd key.R;
-fwd key.S;
-fwd key.T;
-fwd key.U;
-fwd key.V;
-fwd key.W;
-fwd key.X;
-fwd key.Y;
-fwd key.Z;
-fwd key.NUM_0;
-fwd key.NUM_1;
-fwd key.NUM_2;
-fwd key.NUM_3;
-fwd key.NUM_4;
-fwd key.NUM_5;
-fwd key.NUM_6;
-fwd key.NUM_7;
-fwd key.NUM_8;
-fwd key.NUM_9;
-fwd key.RETURN;
-fwd key.ESCAPE;
-fwd key.BACKSPACE;
-fwd key.TAB;
-fwd key.SPACE;
-fwd key.F1;
-fwd key.F2;
-fwd key.F3;
-fwd key.F4;
-fwd key.F5;
-fwd key.F6;
-fwd key.F7;
-fwd key.F8;
-fwd key.F9;
-fwd key.F10;
-fwd key.F11;
-fwd key.F12;
-fwd key.RIGHT;
-fwd key.LEFT;
-fwd key.DOWN;
-fwd key.UP;
-fwd key.LCTRL;
-fwd key.LSHIFT;
-fwd key.LALT;
-fwd key.RCTRL;
-fwd key.RSHIFT;
-fwd key.RALT;
+# --- key scancodes ---
+fwd key.A; fwd key.B; fwd key.C; fwd key.D; fwd key.E; fwd key.F;
+fwd key.G; fwd key.H; fwd key.I; fwd key.J; fwd key.K; fwd key.L;
+fwd key.M; fwd key.N; fwd key.O; fwd key.P; fwd key.Q; fwd key.R;
+fwd key.S; fwd key.T; fwd key.U; fwd key.V; fwd key.W; fwd key.X;
+fwd key.Y; fwd key.Z;
+fwd key.NUM_0; fwd key.NUM_1; fwd key.NUM_2; fwd key.NUM_3;
+fwd key.NUM_4; fwd key.NUM_5; fwd key.NUM_6; fwd key.NUM_7;
+fwd key.NUM_8; fwd key.NUM_9;
+fwd key.RETURN; fwd key.ESCAPE; fwd key.BACKSPACE;
+fwd key.TAB; fwd key.SPACE;
+fwd key.F1; fwd key.F2; fwd key.F3; fwd key.F4; fwd key.F5; fwd key.F6;
+fwd key.F7; fwd key.F8; fwd key.F9; fwd key.F10; fwd key.F11; fwd key.F12;
+fwd key.RIGHT; fwd key.LEFT; fwd key.DOWN; fwd key.UP;
+fwd key.LCTRL; fwd key.LSHIFT; fwd key.LALT;
+fwd key.RCTRL; fwd key.RSHIFT; fwd key.RALT;
 
+# --- gl ---
 fwd gl.create_context;
 fwd gl.destroy_context;
 fwd gl.swap_window;
 fwd gl.get_proc_address;
 
-fwd mouse.BUTTON_LEFT;
-fwd mouse.BUTTON_MIDDLE;
-fwd mouse.BUTTON_RIGHT;
-fwd mouse.BUTTON_X1;
-fwd mouse.BUTTON_X2;
+# --- mouse ---
+fwd mouse.BUTTON_LEFT; fwd mouse.BUTTON_MIDDLE; fwd mouse.BUTTON_RIGHT;
+fwd mouse.BUTTON_X1; fwd mouse.BUTTON_X2;
 fwd mouse.get_state;
 fwd mouse.warp_in_window;
 fwd mouse.show_cursor;
 fwd mouse.hide_cursor;
 
+# --- timer ---
 fwd timer.ticks_ms;
 fwd timer.ticks_ns;
 fwd timer.delay;
@@ -147,28 +116,18 @@ fwd timer.Clock;
 fwd timer.new_clock;
 fwd timer.tick;
 
+# --- gamepad ---
 fwd gamepad.Gamepad;
-fwd gamepad.BUTTON_SOUTH;
-fwd gamepad.BUTTON_EAST;
-fwd gamepad.BUTTON_WEST;
-fwd gamepad.BUTTON_NORTH;
-fwd gamepad.BUTTON_BACK;
-fwd gamepad.BUTTON_GUIDE;
-fwd gamepad.BUTTON_START;
-fwd gamepad.BUTTON_LEFT_STICK;
-fwd gamepad.BUTTON_RIGHT_STICK;
-fwd gamepad.BUTTON_LEFT_SHOULDER;
-fwd gamepad.BUTTON_RIGHT_SHOULDER;
-fwd gamepad.BUTTON_DPAD_UP;
-fwd gamepad.BUTTON_DPAD_DOWN;
-fwd gamepad.BUTTON_DPAD_LEFT;
-fwd gamepad.BUTTON_DPAD_RIGHT;
-fwd gamepad.AXIS_LEFTX;
-fwd gamepad.AXIS_LEFTY;
-fwd gamepad.AXIS_RIGHTX;
-fwd gamepad.AXIS_RIGHTY;
-fwd gamepad.AXIS_LEFT_TRIGGER;
-fwd gamepad.AXIS_RIGHT_TRIGGER;
+fwd gamepad.BUTTON_SOUTH; fwd gamepad.BUTTON_EAST;
+fwd gamepad.BUTTON_WEST; fwd gamepad.BUTTON_NORTH;
+fwd gamepad.BUTTON_BACK; fwd gamepad.BUTTON_GUIDE; fwd gamepad.BUTTON_START;
+fwd gamepad.BUTTON_LEFT_STICK; fwd gamepad.BUTTON_RIGHT_STICK;
+fwd gamepad.BUTTON_LEFT_SHOULDER; fwd gamepad.BUTTON_RIGHT_SHOULDER;
+fwd gamepad.BUTTON_DPAD_UP; fwd gamepad.BUTTON_DPAD_DOWN;
+fwd gamepad.BUTTON_DPAD_LEFT; fwd gamepad.BUTTON_DPAD_RIGHT;
+fwd gamepad.AXIS_LEFTX; fwd gamepad.AXIS_LEFTY;
+fwd gamepad.AXIS_RIGHTX; fwd gamepad.AXIS_RIGHTY;
+fwd gamepad.AXIS_LEFT_TRIGGER; fwd gamepad.AXIS_RIGHT_TRIGGER;
 fwd gamepad.has_gamepad;
 fwd gamepad.gamepad_is_valid;
 fwd gamepad.open_first_gamepad;
@@ -176,3 +135,49 @@ fwd gamepad.close_gamepad;
 fwd gamepad.button;
 fwd gamepad.axis;
 fwd gamepad.axis_normalized;
+fwd gamepad.rumble;
+
+# --- renderer + textures ---
+fwd renderer.create_renderer;
+fwd renderer.destroy_renderer;
+fwd renderer.FSize;
+fwd renderer.set_draw_color;
+fwd renderer.clear;
+fwd renderer.fill_rect;
+fwd renderer.draw_rect;
+fwd renderer.draw_line;
+fwd renderer.present;
+fwd renderer.load_texture;
+fwd renderer.destroy_texture;
+fwd renderer.texture_size;
+fwd renderer.draw_texture;
+
+# --- audio ---
+fwd audio.FORMAT_S16; fwd audio.FORMAT_F32;
+fwd audio.DEVICE_DEFAULT_PLAYBACK;
+fwd audio.Stream;
+fwd audio.stream_is_valid;
+fwd audio.open_playback_stream;
+fwd audio.put_data;
+fwd audio.resume;
+fwd audio.pause;
+fwd audio.destroy;
+
+# --- rect / collision ---
+fwd rect.intersects;
+fwd rect.get_intersection;
+fwd rect.point_in_rect;
+
+# --- random ---
+fwd rand.seed;
+fwd rand.rand_int;
+fwd rand.rand_f32;
+fwd rand.rand_range;
+fwd rand.rand_bool;
+
+# --- message box ---
+fwd msgbox.KIND_ERROR; fwd msgbox.KIND_WARN; fwd msgbox.KIND_INFO;
+fwd msgbox.show;
+fwd msgbox.error;
+fwd msgbox.warn;
+fwd msgbox.info;

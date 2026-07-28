@@ -7,7 +7,10 @@
 use sdl.c;
 use sdl.core;
 use std.types.bool.bool;
+use std.types.bool.true;
+use std.types.bool.false;
 use std.types.string.str;
+
 
 # handle to an SDL window
 # ---
@@ -53,6 +56,40 @@ pub fun open_gl_window(title: str, w: i32, h: i32) Window {
 # window: window to destroy
 pub fun destroy_window(window: Window) {
     c.SDL_DestroyWindow(window.handle);
+}
+
+# change a window's title
+pub fun set_title(window: Window, title: str) bool {
+    ret c.SDL_SetWindowTitle(window.handle, title) != 0;
+}
+
+# plain width/height pair, in pixels
+pub rec Size {
+    w: i32;
+    h: i32;
+}
+
+# a window's current size in pixels
+# ---
+# ret: (width, height); (0, 0) if the query fails
+pub fun get_size(window: Window) Size {
+    var w: i32 = 0;
+    var h: i32 = 0;
+    c.SDL_GetWindowSize(window.handle, ?w, ?h);
+    ret Size{ w: w, h: h };
+}
+
+# move a window
+pub fun set_position(window: Window, x: i32, y: i32) bool {
+    ret c.SDL_SetWindowPosition(window.handle, x, y) != 0;
+}
+
+# toggle fullscreen (borderless, desktop-resolution -- not exclusive
+# fullscreen/videomode-change; that's a separate, unbound SDL call)
+pub fun set_fullscreen(window: Window, fullscreen: bool) bool {
+    var flag: u8 = 0;
+    if (fullscreen) { flag = 1; }
+    ret c.SDL_SetWindowFullscreen(window.handle, flag) != 0;
 }
 
 test "window: create_window/destroy_window round-trip under the dummy driver" {

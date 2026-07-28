@@ -107,6 +107,19 @@ pub fun axis_normalized(gamepad: Gamepad, axis_id: i32) f32 {
     ret (raw::f32) / 32767.0;
 }
 
+# rumble the gamepad, if it supports it -- silently does nothing on
+# gamepads without rumble motors rather than failing.
+# ---
+# gamepad:     an opened, valid Gamepad
+# low_freq:    low-frequency (typically the stronger, "chunky") motor
+#              strength, 0..65535
+# high_freq:   high-frequency (typically weaker, "buzzy") motor strength,
+#              0..65535
+# duration_ms: how long to rumble for
+pub fun rumble(gamepad: Gamepad, low_freq: u16, high_freq: u16, duration_ms: u32) bool {
+    ret c.SDL_RumbleGamepad(gamepad.handle, low_freq, high_freq, duration_ms) != 0;
+}
+
 test "gamepad: has_gamepad does not crash with none connected" {
     val _unused: bool = has_gamepad();
     ret 0;

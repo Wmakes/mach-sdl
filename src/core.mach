@@ -10,6 +10,7 @@ use std.types.bool.bool;
 use std.types.string.str;
 
 pub val INIT_VIDEO:  u32 = c.INIT_VIDEO;
+pub val INIT_AUDIO:  u32 = c.INIT_AUDIO;
 pub val INIT_EVENTS: u32 = c.INIT_EVENTS;
 
 # initialize SDL subsystems. call before creating a window
@@ -53,6 +54,15 @@ pub fun get_error() str {
 # ret: true on success
 pub fun use_dummy_video_driver() bool {
     ret c.SDL_SetHint("SDL_VIDEO_DRIVER", "dummy") != 0;
+}
+
+# force SDL's headless "dummy" audio driver -- same idea as
+# use_dummy_video_driver, for testing sdl.audio without a real sound
+# device. call before init(INIT_AUDIO).
+# ---
+# ret: true on success
+pub fun use_dummy_audio_driver() bool {
+    ret c.SDL_SetHint("SDL_AUDIO_DRIVER", "dummy") != 0;
 }
 
 test "core: get_error is non-nil before init" {

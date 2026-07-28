@@ -1,0 +1,45 @@
+# native message box dialogs
+#
+# simple one-shot dialogs via the OS's own native UI (Win32 MessageBox,
+# macOS NSAlert, GTK on linux). useful for fatal errors, confirmation
+# before a destructive action, or anything where a terminal message would
+# be missed by a non-developer user. blocks until the user clicks OK.
+#
+# window param is optional (pass nil via a zero Window handle if no window
+# exists yet, e.g. during init failure) -- the dialog becomes top-level
+# rather than parented to a window.
+
+use sdl.c;
+use sdl.window.Window;
+use std.types.bool.bool;
+use std.types.string.str;
+
+pub val KIND_ERROR: u32 = c.MESSAGEBOX_ERROR;
+pub val KIND_WARN:  u32 = c.MESSAGEBOX_WARNING;
+pub val KIND_INFO:  u32 = c.MESSAGEBOX_INFORMATION;
+
+# show a simple message box with a title, message, and an OK button
+# ---
+# kind:    KIND_ERROR / KIND_WARN / KIND_INFO
+# title:   dialog title
+# message: body text
+# window:  parent window, or a Window with a nil handle for no parent
+# ret:     true on success; false if the platform couldn't show a dialog
+pub fun show(kind: u32, title: str, message: str, window: Window) bool {
+    ret c.SDL_ShowSimpleMessageBox(kind, title, message, window.handle) != 0;
+}
+
+# show an error dialog -- shorthand for show(KIND_ERROR, ...)
+pub fun error(title: str, message: str, window: Window) bool {
+    ret show(KIND_ERROR, title, message, window);
+}
+
+# show a warning dialog -- shorthand for show(KIND_WARN, ...)
+pub fun warn(title: str, message: str, window: Window) bool {
+    ret show(KIND_WARN, title, message, window);
+}
+
+# show an info dialog -- shorthand for show(KIND_INFO, ...)
+pub fun info(title: str, message: str, window: Window) bool {
+    ret show(KIND_INFO, title, message, window);
+}

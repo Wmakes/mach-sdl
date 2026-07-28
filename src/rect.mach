@@ -1,0 +1,51 @@
+# rectangle intersection / containment
+#
+# common collision-detection building blocks. intersects/get_intersection
+# call real SDL functions; point_in_rect is reimplemented directly in mach
+# because SDL_PointInRectFloat is SDL_FORCE_INLINE in SDL's own header --
+# never actually exported from the compiled library, so there's no symbol
+# to bind against. it's simple comparison logic anyway, not worth an FFI
+# call even if there were one to make.
+
+use sdl.c;
+use std.types.bool.bool;
+
+# whether two rects overlap at all
+pub fun intersects(a: c.FRect, b: c.FRect) bool {
+    ret c.SDL_HasRectIntersectionFloat(?a, ?b) != 0;
+}
+
+# the overlapping region of two rects, if any
+# ---
+# ret: (result, true) if they overlap; result is zeroed and the second
+#      value is false if they don't
+pub fun get_intersection(a: c.FRect, b: c.FRect) c.FRect {
+    var result: c.FRect = c.FRect{ x: 0.0, y: 0.0, w: 0.0, h: 0.0 };
+    c.SDL_GetRectIntersectionFloat(?a, ?b, ?result);
+    ret result;
+}
+
+# whether a point falls inside a rect (left/top inclusive, right/bottom
+# exclusive -- matching SDL's own SDL_PointInRectFloat semantics)
+pub fun point_in_rect(px: f32, py: f32, r: c.FRect) bool {
+    ret px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h;
+}
+
+test "rect: intersects detects overlap and non-overlap" {
+    val a: c.FRect = c.FRect{ x: 0.0, y: 0.0, w: 10.0, h: 10.0 };
+    val b: c.FRect = c.FRect{ x: 5.0, y: 5.0, w: 10.0, h: 10.0 };
+    val c_: c.FRect = c.FRect{ x: 100.0, y: 100.0, w: 10.0, h: 10.0 };
+
+    if (!intersects(a, b)) { ret 1; }
+    if (intersects(a, c_)) { ret 1; }
+    ret 0;
+}
+
+test "rect: point_in_rect is inclusive on the near edge, exclusive on the far edge" {
+    val r: c.FRect = c.FRect{ x: 0.0, y: 0.0, w: 10.0, h: 10.0 };
+
+    if (!point_in_rect(0.0, 0.0, r)) { ret 1; }   # near corner: inside
+    if (point_in_rect(10.0, 10.0, r)) { ret 1; }  # far corner: outside
+    if (point_in_rect(-1.0, 5.0, r)) { ret 1; }   # left of rect: outside
+    ret 0;
+}
