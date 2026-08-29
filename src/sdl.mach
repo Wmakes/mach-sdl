@@ -21,6 +21,7 @@ use sdl.audio;
 use sdl.rect;
 use sdl.rand;
 use sdl.msgbox;
+use sdl.clipboard;
 
 # --- raw types (re-exported so consumers don't need to import sdl.c) ---
 fwd c.Event;
@@ -31,6 +32,8 @@ fwd c.MouseButtonEvent;
 fwd c.MouseWheelEvent;
 fwd c.FRect;
 fwd c.AudioSpec;
+fwd c.Rect;
+fwd c.FPoint;
 
 # --- core ---
 fwd core.INIT_VIDEO;
@@ -55,6 +58,12 @@ fwd window.set_title;
 fwd window.get_size;
 fwd window.set_position;
 fwd window.set_fullscreen;
+fwd window.minimize;
+fwd window.maximize;
+fwd window.restore;
+fwd window.raise;
+fwd window.set_minimum_size;
+fwd window.set_maximum_size;
 
 # --- events ---
 fwd events.EVENT_QUIT;
@@ -107,6 +116,10 @@ fwd mouse.get_state;
 fwd mouse.warp_in_window;
 fwd mouse.show_cursor;
 fwd mouse.hide_cursor;
+fwd mouse.set_relative_mode;
+fwd mouse.relative_mode_enabled;
+fwd mouse.get_relative_state;
+fwd mouse.capture;
 
 # --- timer ---
 fwd timer.ticks_ms;
@@ -151,6 +164,21 @@ fwd renderer.load_texture;
 fwd renderer.destroy_texture;
 fwd renderer.texture_size;
 fwd renderer.draw_texture;
+fwd renderer.BLEND_NONE; fwd renderer.BLEND_BLEND;
+fwd renderer.BLEND_BLEND_PREMULTIPLIED;
+fwd renderer.BLEND_ADD; fwd renderer.BLEND_ADD_PREMULTIPLIED;
+fwd renderer.BLEND_MOD; fwd renderer.BLEND_MUL;
+fwd renderer.set_blend_mode;
+fwd renderer.set_render_target;
+fwd renderer.set_clip_rect;
+fwd renderer.clear_clip_rect;
+fwd renderer.get_clip_rect;
+fwd renderer.Scale;
+fwd renderer.set_render_scale;
+fwd renderer.get_render_scale;
+fwd renderer.render_points;
+fwd renderer.render_lines;
+fwd renderer.fill_rects;
 
 # --- audio ---
 fwd audio.FORMAT_S16; fwd audio.FORMAT_F32;
@@ -181,3 +209,9 @@ fwd msgbox.show;
 fwd msgbox.error;
 fwd msgbox.warn;
 fwd msgbox.info;
+
+# --- clipboard ---
+fwd clipboard.has_text;
+fwd clipboard.set_text;
+fwd clipboard.get_text;
+fwd clipboard.free_text;

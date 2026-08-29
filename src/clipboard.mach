@@ -1,0 +1,45 @@
+# system clipboard text access
+#
+# text only -- no clipboard images or custom mime types (SDL_ClipboardData
+# and friends), which is a bigger surface than anything else bound in
+# this project so far. deferred until something needs it.
+#
+# KNOWN GAP: get_text() hands back the raw SDL-owned pointer, not a
+# copy -- unlike core.get_error() (which reuses a thread-local buffer
+# SDL manages for you), SDL_GetClipboardText allocates a fresh buffer on
+# every call that the CALLER must free. call free_text() on whatever
+# get_text() returns once you're done with it, or it leaks. this
+# binding doesn't copy it into an owned string automatically because
+# doing so would need an allocator dependency this project doesn't
+# otherwise have (see std.allocator in mach-std, used by str_copy) --
+# flagging rather than silently assuming it's safe to treat like an
+# ordinary str.
+
+use sdl.c;
+use std.types.bool.bool;
+use std.types.string.str;
+
+# whether the clipboard currently holds text
+pub fun has_text() bool {
+    ret c.SDL_HasClipboardText() != 0;
+}
+
+# set the clipboard's text content
+pub fun set_text(text: str) bool {
+    ret c.SDL_SetClipboardText(text) != 0;
+}
+
+# the clipboard's current text content
+#
+# see the KNOWN GAP above -- free the result with free_text() when done.
+# ---
+# ret: an SDL-owned string; never nil, but empty on failure or an empty
+#      clipboard
+pub fun get_text() str {
+    ret c.SDL_GetClipboardText();
+}
+
+# free a string previously returned by get_text()
+pub fun free_text(text: str) {
+    c.SDL_free(text::ptr);
+}

@@ -5,6 +5,7 @@
 # `(mask & (1 << (BUTTON_LEFT - 1))) != 0`, not `mask == BUTTON_LEFT`.
 
 use sdl.c;
+use sdl.core;
 use std.types.bool.bool;
 
 pub val BUTTON_LEFT:   u8 = c.BUTTON_LEFT;
@@ -42,4 +43,59 @@ pub fun show_cursor() bool {
 # ret: true on success
 pub fun hide_cursor() bool {
     ret c.SDL_HideCursor() != 0;
+}
+
+# enable/disable relative mouse mode for a window -- while enabled, SDL
+# hides and confines the cursor and reports motion only as deltas (via
+# get_relative_state) rather than absolute position. the standard
+# pattern for FPS-style look controls.
+# ---
+# window:  window handle (ptr, as stored in sdl.window.Window.handle)
+# enabled: true to enter relative mode, false to leave it
+# ret:     true on success
+pub fun set_relative_mode(window: ptr, enabled: bool) bool {
+    var flag: u8 = 0;
+    if (enabled) { flag = 1; }
+    ret c.SDL_SetWindowRelativeMouseMode(window, flag) != 0;
+}
+
+# whether relative mouse mode is currently enabled for a window
+pub fun relative_mode_enabled(window: ptr) bool {
+    ret c.SDL_GetWindowRelativeMouseMode(window) != 0;
+}
+
+# accumulated mouse motion (delta since the last call) and button mask
+# -- only meaningful while relative mode is enabled; see
+# set_relative_mode
+# ---
+# x:   out-param, delta x
+# y:   out-param, delta y
+# ret: bitmask -- test with e.g. `(mask & (1 << (BUTTON_LEFT - 1))) != 0`
+pub fun get_relative_state(x: *f32, y: *f32) u32 {
+    ret c.SDL_GetRelativeMouseState(x, y);
+}
+
+# capture the mouse to this application even outside its window's
+# bounds -- keeps delivering motion/button events past the window edge
+# (e.g. for drag operations). distinct from relative mode: this doesn't
+# hide the cursor or switch to delta-only reporting.
+# ---
+# enabled: true to start capturing, false to release
+# ret:     true on success
+pub fun capture(enabled: bool) bool {
+    var flag: u8 = 0;
+    if (enabled) { flag = 1; }
+    ret c.SDL_CaptureMouse(flag) != 0;
+}
+
+test "mouse: get_relative_state does not crash under the dummy driver" {
+    if (!core.use_dummy_video_driver()) { ret 1; }
+    if (!core.init(core.INIT_VIDEO)) { ret 1; }
+
+    var dx: f32 = 0.0;
+    var dy: f32 = 0.0;
+    val _unused: u32 = get_relative_state(?dx, ?dy);
+
+    core.quit();
+    ret 0;
 }

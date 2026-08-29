@@ -26,6 +26,16 @@
 #             blocks correctly -- you have to click OK before the loop ends)
 #   window    Size from get_size used for the orthographic projection so
 #             resizing the window actually adjusts the coordinate space
+#
+#   phase 1 additions (renderer blend mode / clip rect / render scale /
+#   bulk draws, window minimize+restore, mouse relative mode, clipboard):
+#   renderer  translucent halo via set_blend_mode, a clipped corner
+#             starfield via set_clip_rect + render_points/render_lines,
+#             and a row of tick marks via fill_rects -- all in the
+#             renderer window
+#   window    minimize/restore toggle on the renderer window (N key)
+#   mouse     relative mode toggle on the main window (L key)
+#   clipboard set_text/get_text/free_text round-trip (C/V keys)
 
 use std.runtime;
 use print: std.print;
@@ -208,6 +218,7 @@ fun main(argc: i64, argv: **u8) i64 {
 
     print.println("");
     print.println("WASD=move  SPACE=beep  M=cursor  F=fullscreen  R=rumble  ESC=quit");
+    print.println("L=relative mouse  N=minimize renderer window  C=copy clipboard  V=paste clipboard");
     print.println("collect the green square to score a point");
     print.println("");
 
@@ -219,6 +230,8 @@ fun main(argc: i64, argv: **u8) i64 {
     var move_right: u8 = 0;
     var cursor_hidden: bool = false;
     var fullscreen:    bool = false;
+    var relative_mode: bool = false;
+    var w2_minimized:  bool = false;
 
     var clk: sdl.Clock = sdl.new_clock();
     var print_accum: f64 = 0.0;
@@ -269,6 +282,35 @@ fun main(argc: i64, argv: **u8) i64 {
                     if (have_audio) {
                         sdl.put_data(beep_stream, (?beep[0])::ptr, 2400);
                     }
+                }
+                or (kb.scancode == sdl.L && sdl.key_is_fresh_press(kb)) {
+                    relative_mode = !relative_mode;
+                    sdl.set_relative_mode(w.handle, relative_mode);
+                    if (relative_mode) {
+                        print.println("mouse: relative mode on");
+                    } or {
+                        print.println("mouse: relative mode off");
+                    }
+                }
+                or (kb.scancode == sdl.N && sdl.key_is_fresh_press(kb)) {
+                    if (w2_minimized) {
+                        sdl.restore(w2);
+                        w2_minimized = false;
+                        print.println("renderer window: restored");
+                    } or {
+                        sdl.minimize(w2);
+                        w2_minimized = true;
+                        print.println("renderer window: minimized");
+                    }
+                }
+                or (kb.scancode == sdl.C && sdl.key_is_fresh_press(kb)) {
+                    sdl.set_text("mach-sdl clipboard demo");
+                    print.println("clipboard: copied demo string");
+                }
+                or (kb.scancode == sdl.V && sdl.key_is_fresh_press(kb)) {
+                    val clip_text: str = sdl.get_text();
+                    print.printf("clipboard: {}\n", clip_text);
+                    sdl.free_text(clip_text);
                 }
             }
             or (t == sdl.EVENT_KEY_UP) {
@@ -401,6 +443,45 @@ fun main(argc: i64, argv: **u8) i64 {
         sdl.set_draw_color(rend, 80, 80, 120, 255);
         sdl.draw_rect(rend, border);
 
+        # --- phase 1 additions: blend mode, clip rect, bulk draws ---
+
+        # translucent halo behind the collectible -- exercises blend mode
+        sdl.set_blend_mode(rend, sdl.BLEND_BLEND);
+        val halo: sdl.FRect = sdl.FRect{
+            x: coll_scaled.x - 4.0, y: coll_scaled.y - 4.0,
+            w: coll_scaled.w + 8.0, h: coll_scaled.h + 8.0
+        };
+        sdl.set_draw_color(rend, 50, 230, 80, 90);
+        sdl.fill_rect(rend, halo);
+        sdl.set_blend_mode(rend, sdl.BLEND_NONE);
+
+        # a small corner starfield + connecting line, clipped to the
+        # top-left quadrant -- exercises set_clip_rect, render_points,
+        # render_lines
+        val star_clip: sdl.Rect = sdl.Rect{ x: 0, y: 0, w: 140, h: 140 };
+        sdl.set_clip_rect(rend, star_clip);
+
+        var star_points: [5]sdl.FPoint;
+        star_points[0] = sdl.FPoint{ x: 10.0, y: 10.0 };
+        star_points[1] = sdl.FPoint{ x: 15.0, y: 25.0 };
+        star_points[2] = sdl.FPoint{ x: 22.0, y: 12.0 };
+        star_points[3] = sdl.FPoint{ x: 30.0, y: 28.0 };
+        star_points[4] = sdl.FPoint{ x: 35.0, y: 15.0 };
+        sdl.set_draw_color(rend, 255, 255, 255, 255);
+        sdl.render_points(rend, (?star_points[0])::ptr, 5);
+        sdl.set_draw_color(rend, 120, 180, 255, 255);
+        sdl.render_lines(rend, (?star_points[0])::ptr, 5);
+
+        sdl.clear_clip_rect(rend);
+
+        # a few tick marks along the bottom edge -- exercises fill_rects
+        var tick_rects: [3]sdl.FRect;
+        tick_rects[0] = sdl.FRect{ x: 20.0, y: 268.0, w: 4.0, h: 8.0 };
+        tick_rects[1] = sdl.FRect{ x: 40.0, y: 268.0, w: 4.0, h: 8.0 };
+        tick_rects[2] = sdl.FRect{ x: 60.0, y: 268.0, w: 4.0, h: 8.0 };
+        sdl.set_draw_color(rend, 255, 200, 60, 255);
+        sdl.fill_rects(rend, (?tick_rects[0])::ptr, 3);
+
         sdl.present(rend);
     }
 
@@ -408,6 +489,7 @@ fun main(argc: i64, argv: **u8) i64 {
     val nil_win: sdl.Window = sdl.Window{ handle: nil };
     sdl.info("mach-sdl demo", "clean shutdown. all modules exercised.", nil_win);
 
+    if (relative_mode) { sdl.set_relative_mode(w.handle, false); }
     if (have_gamepad) { sdl.close_gamepad(gp); }
     if (have_audio)   { sdl.destroy(beep_stream); }
     sdl.destroy_renderer(rend);

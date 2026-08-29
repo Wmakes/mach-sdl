@@ -363,3 +363,114 @@ pub val MESSAGEBOX_WARNING:     u32 = 0x00000020;
 pub val MESSAGEBOX_INFORMATION: u32 = 0x00000040;
 
 pub ext fun SDL_ShowSimpleMessageBox(flags: u32, title: *u8, message: *u8, window: ptr) u8;
+
+# --- blend modes (SDL_blendmode.h) ---
+#
+# SDL_BlendMode is a plain Uint32 flag/enum, not a struct -- these are
+# just named constants, same shape as the MESSAGEBOX_* block above.
+# values confirmed against the real header, release-3.2.0.
+
+pub val BLENDMODE_NONE:                u32 = 0x00000000;
+pub val BLENDMODE_BLEND:               u32 = 0x00000001;
+pub val BLENDMODE_BLEND_PREMULTIPLIED: u32 = 0x00000010;
+pub val BLENDMODE_ADD:                 u32 = 0x00000002;
+pub val BLENDMODE_ADD_PREMULTIPLIED:   u32 = 0x00000020;
+pub val BLENDMODE_MOD:                 u32 = 0x00000004;
+pub val BLENDMODE_MUL:                 u32 = 0x00000008;
+
+pub ext fun SDL_SetRenderDrawBlendMode(renderer: ptr, blend_mode: u32) u8;
+
+# --- render target (SDL_render.h) ---
+#
+# nil restores the window itself as the target.
+#
+# KNOWN GAP: a texture passed here must have been created with
+# render-target access (SDL_CreateTexture + SDL_TEXTUREACCESS_TARGET on
+# the C side). This binding only creates textures via
+# renderer.load_texture (SDL_LoadBMP + SDL_CreateTextureFromSurface),
+# which does NOT grant render-target access -- a lower-level
+# SDL_CreateTexture binding would be needed before render-to-texture is
+# actually usable here. flagging rather than assuming it works.
+
+pub ext fun SDL_SetRenderTarget(renderer: ptr, texture: ptr) u8;
+
+# --- clip rect (SDL_rect.h / SDL_render.h) ---
+#
+# unlike everything else in this renderer surface, SDL's clip-rect calls
+# use the *integer* SDL_Rect, not SDL_FRect -- transcribed separately.
+# SDL_Rect: 4 int fields (x, y, w, h), no padding -- every offset already
+# 4-aligned and the total (16) is a multiple of 4.
+pub rec Rect {
+    x: i32;
+    y: i32;
+    w: i32;
+    h: i32;
+}
+
+test "sdl.c: Rect layout is 16 bytes" {
+    if ($size_of(Rect) != 16) { ret 1; }
+    ret 0;
+}
+
+pub ext fun SDL_SetRenderClipRect(renderer: ptr, rect: *Rect) u8;
+pub ext fun SDL_GetRenderClipRect(renderer: ptr, rect: *Rect) u8;
+
+# --- render scale (SDL_render.h) ---
+
+pub ext fun SDL_SetRenderScale(renderer: ptr, scale_x: f32, scale_y: f32) u8;
+pub ext fun SDL_GetRenderScale(renderer: ptr, scale_x: *f32, scale_y: *f32) u8;
+
+# --- bulk draws (SDL_render.h) ---
+#
+# SDL_FPoint: 2 f32 fields, no padding -- same reasoning as FRect above
+# (every offset already 4-aligned, total already a multiple of 4).
+pub rec FPoint {
+    x: f32;
+    y: f32;
+}
+
+test "sdl.c: FPoint layout is 8 bytes" {
+    if ($size_of(FPoint) != 8) { ret 1; }
+    ret 0;
+}
+
+pub ext fun SDL_RenderPoints(renderer: ptr, points: ptr, count: i32) u8;
+pub ext fun SDL_RenderLines(renderer: ptr, points: ptr, count: i32) u8;
+pub ext fun SDL_RenderFillRects(renderer: ptr, rects: ptr, count: i32) u8;
+
+# --- clipboard (SDL_clipboard.h) ---
+#
+# SDL_GetClipboardText allocates a fresh buffer on every call (unlike
+# SDL_GetError's reused thread-local buffer) -- the caller owns it and
+# must free it with SDL_free. Returns an empty string (never nil) on
+# failure too. See clipboard.mach's get_text/free_text.
+
+pub ext fun SDL_SetClipboardText(text: *u8) u8;
+pub ext fun SDL_GetClipboardText() *u8;
+pub ext fun SDL_HasClipboardText() u8;
+
+# --- memory (SDL_stdinc.h) ---
+#
+# needed specifically to free SDL-owned heap allocations this binding
+# receives: the gamepad-ID array from SDL_GetGamepads (gamepad.mach's
+# open_first_gamepad -- previously a known leak, now fixed by calling
+# this) and the string from SDL_GetClipboardText (clipboard.mach's
+# free_text).
+
+pub ext fun SDL_free(mem: ptr);
+
+# --- mouse relative mode + capture (SDL_mouse.h) ---
+
+pub ext fun SDL_SetWindowRelativeMouseMode(window: ptr, enabled: u8) u8;
+pub ext fun SDL_GetWindowRelativeMouseMode(window: ptr) u8;
+pub ext fun SDL_GetRelativeMouseState(x: *f32, y: *f32) u32;
+pub ext fun SDL_CaptureMouse(enabled: u8) u8;
+
+# --- window minimize/maximize/restore/raise + min/max size (SDL_video.h) ---
+
+pub ext fun SDL_MinimizeWindow(window: ptr) u8;
+pub ext fun SDL_MaximizeWindow(window: ptr) u8;
+pub ext fun SDL_RestoreWindow(window: ptr) u8;
+pub ext fun SDL_RaiseWindow(window: ptr) u8;
+pub ext fun SDL_SetWindowMinimumSize(window: ptr, min_w: i32, min_h: i32) u8;
+pub ext fun SDL_SetWindowMaximumSize(window: ptr, max_w: i32, max_h: i32) u8;

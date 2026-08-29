@@ -92,6 +92,36 @@ pub fun set_fullscreen(window: Window, fullscreen: bool) bool {
     ret c.SDL_SetWindowFullscreen(window.handle, flag) != 0;
 }
 
+# minimize (iconify) the window
+pub fun minimize(window: Window) bool {
+    ret c.SDL_MinimizeWindow(window.handle) != 0;
+}
+
+# maximize the window
+pub fun maximize(window: Window) bool {
+    ret c.SDL_MaximizeWindow(window.handle) != 0;
+}
+
+# restore a minimized or maximized window to its previous size/position
+pub fun restore(window: Window) bool {
+    ret c.SDL_RestoreWindow(window.handle) != 0;
+}
+
+# raise the window above other windows and give it input focus
+pub fun raise(window: Window) bool {
+    ret c.SDL_RaiseWindow(window.handle) != 0;
+}
+
+# set the smallest size a user is allowed to resize the window down to
+pub fun set_minimum_size(window: Window, w: i32, h: i32) bool {
+    ret c.SDL_SetWindowMinimumSize(window.handle, w, h) != 0;
+}
+
+# set the largest size a user is allowed to resize the window up to
+pub fun set_maximum_size(window: Window, w: i32, h: i32) bool {
+    ret c.SDL_SetWindowMaximumSize(window.handle, w, h) != 0;
+}
+
 test "window: create_window/destroy_window round-trip under the dummy driver" {
     if (!core.use_dummy_video_driver()) { ret 1; }
     if (!core.init(core.INIT_VIDEO)) { ret 1; }

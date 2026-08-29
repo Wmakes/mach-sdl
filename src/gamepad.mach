@@ -55,10 +55,9 @@ pub fun gamepad_is_valid(gamepad: Gamepad) bool {
 # sdl.c.SDL_GetGamepads is available directly -- this wrapper only covers
 # the single-player case, which is most of what needs a gamepad at all.
 #
-# KNOWN GAP: SDL_GetGamepads returns a heap-allocated array that SDL's
-# own docs say to free with SDL_free() -- that's not bound yet, so this
-# leaks one small array per call. fine for "call once at startup," not
-# fine if you're calling this in a loop to detect hot-plugged gamepads.
+# previously leaked the heap-allocated array SDL_GetGamepads returns
+# (SDL's own docs say to free it with SDL_free) -- fixed now that
+# SDL_free is bound in c.mach.
 # ---
 # ret: the opened Gamepad; nil handle if none is connected or open failed
 pub fun open_first_gamepad() Gamepad {
@@ -69,6 +68,7 @@ pub fun open_first_gamepad() Gamepad {
     }
 
     val first_id: u32 = @(ids::*u32);
+    c.SDL_free(ids);
     ret Gamepad{ handle: c.SDL_OpenGamepad(first_id) };
 }
 

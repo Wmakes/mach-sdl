@@ -110,6 +110,106 @@ pub fun draw_texture(renderer: ptr, texture: ptr, dst_rect: c.FRect) bool {
     ret c.SDL_RenderTexture(renderer, texture, nil, ?dst_rect) != 0;
 }
 
+# --- blend mode ---
+
+pub val BLEND_NONE:                u32 = c.BLENDMODE_NONE;
+pub val BLEND_BLEND:               u32 = c.BLENDMODE_BLEND;
+pub val BLEND_BLEND_PREMULTIPLIED: u32 = c.BLENDMODE_BLEND_PREMULTIPLIED;
+pub val BLEND_ADD:                 u32 = c.BLENDMODE_ADD;
+pub val BLEND_ADD_PREMULTIPLIED:   u32 = c.BLENDMODE_ADD_PREMULTIPLIED;
+pub val BLEND_MOD:                 u32 = c.BLENDMODE_MOD;
+pub val BLEND_MUL:                 u32 = c.BLENDMODE_MUL;
+
+# set how subsequent draw calls (fill/rect/line/point/texture) combine
+# with what's already on the render target -- BLEND_NONE (opaque
+# overwrite) until changed
+pub fun set_blend_mode(renderer: ptr, blend_mode: u32) bool {
+    ret c.SDL_SetRenderDrawBlendMode(renderer, blend_mode) != 0;
+}
+
+# --- render target ---
+#
+# KNOWN GAP: see c.mach's SDL_SetRenderTarget comment -- textures from
+# load_texture() are not guaranteed valid render targets, since this
+# binding has no lower-level SDL_CreateTexture call that requests
+# render-target access. safe today only for restoring the default
+# target (pass nil).
+# ---
+# renderer: renderer to redirect
+# texture:  texture to render into, or nil to restore the window itself
+pub fun set_render_target(renderer: ptr, texture: ptr) bool {
+    ret c.SDL_SetRenderTarget(renderer, texture) != 0;
+}
+
+# --- clip rect ---
+#
+# note the *integer* c.Rect here, not c.FRect like every other rect in
+# this module -- SDL's clip-rect calls are integer-only.
+
+# restrict drawing to a sub-region of the render target
+pub fun set_clip_rect(renderer: ptr, rect: c.Rect) bool {
+    ret c.SDL_SetRenderClipRect(renderer, ?rect) != 0;
+}
+
+# remove any clip restriction, drawing to the full target again
+pub fun clear_clip_rect(renderer: ptr) bool {
+    ret c.SDL_SetRenderClipRect(renderer, nil) != 0;
+}
+
+# the renderer's current clip rect
+# ---
+# ret: the active clip rect; all-zero if there is none set
+pub fun get_clip_rect(renderer: ptr) c.Rect {
+    var r: c.Rect = c.Rect{ x: 0, y: 0, w: 0, h: 0 };
+    c.SDL_GetRenderClipRect(renderer, ?r);
+    ret r;
+}
+
+# --- render scale ---
+#
+# scales every subsequent drawing coordinate (fill/rect/line/point/
+# texture calls) -- does not affect the window's own pixel size, just
+# how renderer-space coordinates map onto it.
+
+pub rec Scale {
+    x: f32;
+    y: f32;
+}
+
+pub fun set_render_scale(renderer: ptr, x: f32, y: f32) bool {
+    ret c.SDL_SetRenderScale(renderer, x, y) != 0;
+}
+
+pub fun get_render_scale(renderer: ptr) Scale {
+    var x: f32 = 0.0;
+    var y: f32 = 0.0;
+    c.SDL_GetRenderScale(renderer, ?x, ?y);
+    ret Scale{ x: x, y: y };
+}
+
+# --- bulk draws ---
+#
+# all three take a pointer to the first element of a c.FPoint (or
+# c.FRect) array plus a count -- same "pointer to first element, cast to
+# ptr" convention as sdl.audio.put_data's buf param: build the pointer
+# with `(?arr[0])::ptr`.
+
+# draw a batch of individual points with the current draw color
+pub fun render_points(renderer: ptr, points: ptr, count: i32) bool {
+    ret c.SDL_RenderPoints(renderer, points, count) != 0;
+}
+
+# draw connected line segments through a batch of points ("connect the
+# dots") with the current draw color
+pub fun render_lines(renderer: ptr, points: ptr, count: i32) bool {
+    ret c.SDL_RenderLines(renderer, points, count) != 0;
+}
+
+# fill a batch of rectangles with the current draw color
+pub fun fill_rects(renderer: ptr, rects: ptr, count: i32) bool {
+    ret c.SDL_RenderFillRects(renderer, rects, count) != 0;
+}
+
 test "renderer: create/clear/present/destroy round-trip under the dummy driver" {
     if (!core.use_dummy_video_driver()) { ret 1; }
     if (!core.init(core.INIT_VIDEO)) { ret 1; }
@@ -134,6 +234,57 @@ test "renderer: create/clear/present/destroy round-trip under the dummy driver" 
     val rect: c.FRect = c.FRect{ x: 0.0, y: 0.0, w: 10.0, h: 10.0 };
     ok = ok && fill_rect(r, rect);
     ok = ok && present(r);
+
+    destroy_renderer(r);
+    c.SDL_DestroyWindow(win);
+    core.quit();
+
+    if (!ok) { ret 1; }
+    ret 0;
+}
+
+test "renderer: blend mode, clip rect, scale, and bulk draws round-trip under the dummy driver" {
+    if (!core.use_dummy_video_driver()) { ret 1; }
+    if (!core.init(core.INIT_VIDEO)) { ret 1; }
+
+    val win: ptr = c.SDL_CreateWindow("renderer extras test", 64, 64, 0);
+    if (win == nil) {
+        core.quit();
+        ret 1;
+    }
+    val win_rec: Window = Window{ handle: win };
+
+    val r: ptr = create_renderer(win_rec);
+    if (r == nil) {
+        c.SDL_DestroyWindow(win);
+        core.quit();
+        ret 1;
+    }
+
+    var ok: bool = set_blend_mode(r, BLEND_BLEND);
+
+    val clip: c.Rect = c.Rect{ x: 0, y: 0, w: 32, h: 32 };
+    ok = ok && set_clip_rect(r, clip);
+    ok = ok && clear_clip_rect(r);
+    val _unused_clip: c.Rect = get_clip_rect(r);
+
+    ok = ok && set_render_scale(r, 1.0, 1.0);
+    val scale: Scale = get_render_scale(r);
+    if (scale.x != 1.0 || scale.y != 1.0) { ok = 0; }
+
+    var pts: [3]c.FPoint;
+    pts[0] = c.FPoint{ x: 1.0, y: 1.0 };
+    pts[1] = c.FPoint{ x: 2.0, y: 2.0 };
+    pts[2] = c.FPoint{ x: 3.0, y: 3.0 };
+    ok = ok && render_points(r, (?pts[0])::ptr, 3);
+    ok = ok && render_lines(r, (?pts[0])::ptr, 3);
+
+    var rects: [2]c.FRect;
+    rects[0] = c.FRect{ x: 0.0, y: 0.0, w: 4.0, h: 4.0 };
+    rects[1] = c.FRect{ x: 8.0, y: 8.0, w: 4.0, h: 4.0 };
+    ok = ok && fill_rects(r, (?rects[0])::ptr, 2);
+
+    ok = ok && set_render_target(r, nil);
 
     destroy_renderer(r);
     c.SDL_DestroyWindow(win);
