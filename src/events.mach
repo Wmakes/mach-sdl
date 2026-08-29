@@ -31,6 +31,8 @@ pub val EVENT_MOUSE_BUTTON_DOWN: u32 = c.EVENT_MOUSE_BUTTON_DOWN;
 pub val EVENT_MOUSE_BUTTON_UP:   u32 = c.EVENT_MOUSE_BUTTON_UP;
 pub val EVENT_MOUSE_WHEEL:       u32 = c.EVENT_MOUSE_WHEEL;
 
+pub val EVENT_TEXT_INPUT: u32 = c.EVENT_TEXT_INPUT;
+
 # pull the next event off the queue, if any
 # ---
 # event: out-param, filled when this returns true
@@ -95,6 +97,17 @@ pub fun as_mouse_button(event: *c.Event) c.MouseButtonEvent {
 pub fun as_mouse_wheel(event: *c.Event) c.MouseWheelEvent {
     val m: *c.MouseWheelEvent = event::*c.MouseWheelEvent;
     ret @m;
+}
+
+# reinterpret a text input event -- only valid when event_type() is
+# EVENT_TEXT_INPUT. the returned text pointer points to SDL's internal
+# buffer and is only valid until the next SDL_PollEvent call.
+# ---
+# event: an event already filled by poll_event
+# ret:   the TextInputEvent, copied out by value
+pub fun as_text_input(event: *c.Event) c.TextInputEvent {
+    val t: *c.TextInputEvent = event::*c.TextInputEvent;
+    ret @t;
 }
 
 # whether a KeyboardEvent represents a key going down (vs. up, or a repeat)

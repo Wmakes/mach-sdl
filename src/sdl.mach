@@ -30,6 +30,7 @@ fwd c.WindowEvent;
 fwd c.MouseMotionEvent;
 fwd c.MouseButtonEvent;
 fwd c.MouseWheelEvent;
+fwd c.TextInputEvent;
 fwd c.FRect;
 fwd c.AudioSpec;
 fwd c.Rect;
@@ -84,6 +85,8 @@ fwd events.as_window;
 fwd events.as_mouse_motion;
 fwd events.as_mouse_button;
 fwd events.as_mouse_wheel;
+fwd events.EVENT_TEXT_INPUT;
+fwd events.as_text_input;
 fwd events.key_is_fresh_press;
 
 # --- key scancodes ---
@@ -149,6 +152,8 @@ fwd gamepad.button;
 fwd gamepad.axis;
 fwd gamepad.axis_normalized;
 fwd gamepad.rumble;
+fwd gamepad.gamepad_name;
+fwd gamepad.rumble_triggers;
 
 # --- renderer + textures ---
 fwd renderer.create_renderer;
@@ -179,6 +184,18 @@ fwd renderer.get_render_scale;
 fwd renderer.render_points;
 fwd renderer.render_lines;
 fwd renderer.fill_rects;
+fwd renderer.set_texture_blend_mode;
+fwd renderer.get_texture_blend_mode;
+fwd renderer.set_texture_color_mod;
+fwd renderer.get_texture_color_mod;
+fwd renderer.set_texture_alpha_mod;
+fwd renderer.get_texture_alpha_mod;
+fwd renderer.SCALEMODE_NEAREST; fwd renderer.SCALEMODE_LINEAR;
+fwd renderer.set_texture_scale_mode;
+fwd renderer.get_texture_scale_mode;
+fwd renderer.FLIP_NONE; fwd renderer.FLIP_HORIZONTAL; fwd renderer.FLIP_VERTICAL;
+fwd renderer.draw_texture_rotated;
+fwd renderer.ColorRGB;
 
 # --- audio ---
 fwd audio.FORMAT_S16; fwd audio.FORMAT_F32;
@@ -190,6 +207,10 @@ fwd audio.put_data;
 fwd audio.resume;
 fwd audio.pause;
 fwd audio.destroy;
+fwd audio.bytes_available;
+fwd audio.clear_stream;
+fwd audio.get_playback_devices;
+fwd audio.get_device_name;
 
 # --- rect / collision ---
 fwd rect.intersects;

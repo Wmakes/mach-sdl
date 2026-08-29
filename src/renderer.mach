@@ -13,6 +13,8 @@ use sdl.c;
 use sdl.core;
 use sdl.window.Window;
 use std.types.bool.bool;
+use std.types.bool.true;
+use std.types.bool.false;
 use std.types.string.str;
 
 # create a renderer for a window
@@ -87,6 +89,13 @@ pub fun destroy_texture(texture: ptr) {
 pub rec FSize {
     w: f32;
     h: f32;
+}
+
+# color triple returned by get_texture_color_mod
+pub rec ColorRGB {
+    r: u8;
+    g: u8;
+    b: u8;
 }
 
 # a texture's width/height in pixels
@@ -210,6 +219,69 @@ pub fun fill_rects(renderer: ptr, rects: ptr, count: i32) bool {
     ret c.SDL_RenderFillRects(renderer, rects, count) != 0;
 }
 
+# --- texture properties ---
+#
+# per-texture blend mode, color/alpha modulation, and scale mode --
+# independent of the renderer-level draw blend mode.
+
+pub fun set_texture_blend_mode(texture: ptr, blend_mode: u32) bool {
+    ret c.SDL_SetTextureBlendMode(texture, blend_mode) != 0;
+}
+
+pub fun get_texture_blend_mode(texture: ptr) u32 {
+    var mode: u32 = 0;
+    c.SDL_GetTextureBlendMode(texture, ?mode);
+    ret mode;
+}
+
+pub fun set_texture_color_mod(texture: ptr, r: u8, g: u8, b: u8) bool {
+    ret c.SDL_SetTextureColorMod(texture, r, g, b) != 0;
+}
+
+pub fun get_texture_color_mod(texture: ptr) ColorRGB {
+    var r: u8 = 0;
+    var g: u8 = 0;
+    var b: u8 = 0;
+    c.SDL_GetTextureColorMod(texture, ?r, ?g, ?b);
+    ret ColorRGB{ r: r, g: g, b: b };
+}
+
+pub fun set_texture_alpha_mod(texture: ptr, alpha: u8) bool {
+    ret c.SDL_SetTextureAlphaMod(texture, alpha) != 0;
+}
+
+pub fun get_texture_alpha_mod(texture: ptr) u8 {
+    var alpha: u8 = 0;
+    c.SDL_GetTextureAlphaMod(texture, ?alpha);
+    ret alpha;
+}
+
+# scale mode: SCALEMODE_NEAREST (pixel art) or SCALEMODE_LINEAR (smooth)
+pub val SCALEMODE_NEAREST: u32 = c.SCALEMODE_NEAREST;
+pub val SCALEMODE_LINEAR:  u32 = c.SCALEMODE_LINEAR;
+
+pub fun set_texture_scale_mode(texture: ptr, scale_mode: u32) bool {
+    ret c.SDL_SetTextureScaleMode(texture, scale_mode) != 0;
+}
+
+pub fun get_texture_scale_mode(texture: ptr) u32 {
+    var mode: u32 = 0;
+    c.SDL_GetTextureScaleMode(texture, ?mode);
+    ret mode;
+}
+
+# --- rotated/flipped texture draw ---
+#
+# flip flags: FLIP_NONE, FLIP_HORIZONTAL, FLIP_VERTICAL
+
+pub val FLIP_NONE:       u32 = c.FLIP_NONE;
+pub val FLIP_HORIZONTAL: u32 = c.FLIP_HORIZONTAL;
+pub val FLIP_VERTICAL:   u32 = c.FLIP_VERTICAL;
+
+pub fun draw_texture_rotated(renderer: ptr, texture: ptr, dst_rect: c.FRect, angle: f64, center: c.FPoint, flip: u32) bool {
+    ret c.SDL_RenderTextureRotated(renderer, texture, nil, ?dst_rect, angle, ?center, flip) != 0;
+}
+
 test "renderer: create/clear/present/destroy round-trip under the dummy driver" {
     if (!core.use_dummy_video_driver()) { ret 1; }
     if (!core.init(core.INIT_VIDEO)) { ret 1; }
@@ -319,5 +391,72 @@ test "renderer: load_texture on a nonexistent file fails cleanly (no crash)" {
     core.quit();
 
     if (tex != nil) { ret 1; }  # should have failed, not succeeded
+    ret 0;
+}
+
+test "renderer: texture blend mode, color/alpha mod, and scale mode round-trip" {
+    if (!core.use_dummy_video_driver()) { ret 1; }
+    if (!core.init(core.INIT_VIDEO)) { ret 1; }
+
+    val win: ptr = c.SDL_CreateWindow("texture props test", 64, 64, 0);
+    if (win == nil) {
+        core.quit();
+        ret 1;
+    }
+    val win_rec: Window = Window{ handle: win };
+
+    val r: ptr = create_renderer(win_rec);
+    if (r == nil) {
+        c.SDL_DestroyWindow(win);
+        core.quit();
+        ret 1;
+    }
+
+    # create a texture to exercise property getters/setters
+    val tex: ptr = c.SDL_CreateTexture(r, c.PIXELFORMAT_RGBA8888, c.TEXTUREACCESS_STATIC, 8, 8);
+    if (tex == nil) {
+        destroy_renderer(r);
+        c.SDL_DestroyWindow(win);
+        core.quit();
+        ret 1;
+    }
+
+    var ok: bool = true;
+
+    # blend mode
+    ok = ok && set_texture_blend_mode(tex, BLEND_BLEND);
+    val blend: u32 = get_texture_blend_mode(tex);
+    if (blend != BLEND_BLEND) { ok = false; }
+
+    # color mod
+    ok = ok && set_texture_color_mod(tex, 100, 150, 200);
+    val rgb: ColorRGB = get_texture_color_mod(tex);
+    if (rgb.r != 100 || rgb.g != 150 || rgb.b != 200) { ok = false; }
+
+    # alpha mod
+    ok = ok && set_texture_alpha_mod(tex, 128);
+    val alpha: u8 = get_texture_alpha_mod(tex);
+    if (alpha != 128) { ok = false; }
+
+    # scale mode
+    ok = ok && set_texture_scale_mode(tex, SCALEMODE_NEAREST);
+    val sm: u32 = get_texture_scale_mode(tex);
+    if (sm != SCALEMODE_NEAREST) { ok = false; }
+
+    # draw rotated (no flip, 0 degrees)
+    val dst: c.FRect = c.FRect{ x: 0.0, y: 0.0, w: 8.0, h: 8.0 };
+    val ctr: c.FPoint = c.FPoint{ x: 4.0, y: 4.0 };
+    ok = ok && draw_texture_rotated(r, tex, dst, 0.0, ctr, FLIP_NONE);
+    ok = ok && present(r);
+
+    # draw with horizontal flip
+    ok = ok && draw_texture_rotated(r, tex, dst, 0.0, ctr, FLIP_HORIZONTAL);
+
+    destroy_texture(tex);
+    destroy_renderer(r);
+    c.SDL_DestroyWindow(win);
+    core.quit();
+
+    if (!ok) { ret 1; }
     ret 0;
 }

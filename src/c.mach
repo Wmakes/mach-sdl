@@ -194,6 +194,31 @@ test "sdl.c: MouseWheelEvent layout is 48 bytes" {
     ret 0;
 }
 
+# --- text input (SDL_keyboard.h / SDL_events.h) ---
+#
+# text input is disabled by default -- SDL_StartTextInput must be called
+# before any EVENT_TEXT_INPUT events appear. SDL_TextInputEvent.text is a
+# const char* pointer to an SDL-internal buffer, valid only until the next
+# SDL_PollEvent; copy it if you need to keep it.
+
+pub val EVENT_TEXT_INPUT: u32 = 0x303;
+
+pub rec TextInputEvent {
+    event_type: u32;
+    reserved:   u32;
+    timestamp:  u64;
+    window_id:  u32;
+    text:       *u8;
+}
+
+test "sdl.c: TextInputEvent layout is 32 bytes" {
+    if ($size_of(TextInputEvent) != 32) { ret 1; }
+    ret 0;
+}
+
+pub ext fun SDL_StartTextInput(window: ptr) u8;
+pub ext fun SDL_StopTextInput(window: ptr) u8;
+
 # --- SDL_timer.h ---
 #
 # no structs here -- every function is a plain scalar in, scalar out, so
@@ -314,6 +339,19 @@ pub ext fun SDL_ResumeAudioStreamDevice(stream: ptr) u8;
 pub ext fun SDL_PauseAudioStreamDevice(stream: ptr) u8;
 pub ext fun SDL_DestroyAudioStream(stream: ptr);
 
+# --- audio stream queries + device enumeration (SDL_audio.h) ---
+#
+# SDL_GetAudioStreamAvailable returns bytes queued (signed), useful for
+# checking if a stream has data ready. SDL_ClearAudioStream discards all
+# buffered data. SDL_GetAudioPlaybackDevices returns a heap-allocated
+# array of device IDs -- caller must free with SDL_free. SDL_GetAudioDeviceName
+# returns a pointer to an internal string (no copy needed, no free needed).
+
+pub ext fun SDL_GetAudioStreamAvailable(stream: ptr) i32;
+pub ext fun SDL_ClearAudioStream(stream: ptr) u8;
+pub ext fun SDL_GetAudioPlaybackDevices(count: *i32) ptr;
+pub ext fun SDL_GetAudioDeviceName(devid: u32) *u8;
+
 # --- textures (SDL_surface.h / SDL_render.h) ---
 #
 # just enough to draw a static image: load a BMP into a surface, upload
@@ -322,12 +360,47 @@ pub ext fun SDL_DestroyAudioStream(stream: ptr);
 # SDL_image, a separate library not bound here) -- deferred until
 # something needs them.
 
+pub val TEXTUREACCESS_STATIC:    i32 = 0;
+pub val TEXTUREACCESS_STREAMING: i32 = 1;
+pub val TEXTUREACCESS_TARGET:    i32 = 2;
+
+pub val PIXELFORMAT_RGBA8888: u32 = 0x16462004;
+
 pub ext fun SDL_LoadBMP(file: *u8) ptr;
 pub ext fun SDL_DestroySurface(surface: ptr);
 pub ext fun SDL_CreateTextureFromSurface(renderer: ptr, surface: ptr) ptr;
+pub ext fun SDL_CreateTexture(renderer: ptr, format: u32, access: i32, w: i32, h: i32) ptr;
 pub ext fun SDL_DestroyTexture(texture: ptr);
 pub ext fun SDL_GetTextureSize(texture: ptr, w: *f32, h: *f32) u8;
 pub ext fun SDL_RenderTexture(renderer: ptr, texture: ptr, srcrect: *FRect, dstrect: *FRect) u8;
+
+pub ext fun SDL_RenderTextureRotated(renderer: ptr, texture: ptr, srcrect: *FRect, dstrect: *FRect, angle: f64, center: *FPoint, flip: u32) u8;
+
+# --- scale mode + flip mode (SDL_surface.h) ---
+#
+# plain integer enums, not structs -- just named constants.
+
+pub val SCALEMODE_NEAREST: u32 = 0;
+pub val SCALEMODE_LINEAR:  u32 = 1;
+
+pub val FLIP_NONE:       u32 = 0;
+pub val FLIP_HORIZONTAL: u32 = 1;
+pub val FLIP_VERTICAL:   u32 = 2;
+
+# --- texture properties (SDL_render.h) ---
+#
+# blend mode, color/alpha mod, and scale mode on individual textures.
+# these are independent of the renderer-level draw blend mode set by
+# set_blend_mode above.
+
+pub ext fun SDL_SetTextureBlendMode(texture: ptr, blend_mode: u32) u8;
+pub ext fun SDL_GetTextureBlendMode(texture: ptr, blend_mode: *u32) u8;
+pub ext fun SDL_SetTextureColorMod(texture: ptr, r: u8, g: u8, b: u8) u8;
+pub ext fun SDL_GetTextureColorMod(texture: ptr, r: *u8, g: *u8, b: *u8) u8;
+pub ext fun SDL_SetTextureAlphaMod(texture: ptr, alpha: u8) u8;
+pub ext fun SDL_GetTextureAlphaMod(texture: ptr, alpha: *u8) u8;
+pub ext fun SDL_SetTextureScaleMode(texture: ptr, scale_mode: u32) u8;
+pub ext fun SDL_GetTextureScaleMode(texture: ptr, scale_mode: *u32) u8;
 
 # --- more window management (SDL_video.h) ---
 
@@ -339,6 +412,15 @@ pub ext fun SDL_SetWindowFullscreen(window: ptr, fullscreen: u8) u8;
 # --- gamepad rumble (SDL_gamepad.h) ---
 
 pub ext fun SDL_RumbleGamepad(gamepad: ptr, low_freq: u16, high_freq: u16, duration_ms: u32) u8;
+
+# --- gamepad name + trigger rumble (SDL_gamepad.h) ---
+#
+# SDL_GetGamepadName returns a pointer to an internal string (no copy
+# needed, no free needed). SDL_RumbleGamepadTriggers is only supported
+# on Xbox One gamepads; silently does nothing on other hardware.
+
+pub ext fun SDL_GetGamepadName(gamepad: ptr) *u8;
+pub ext fun SDL_RumbleGamepadTriggers(gamepad: ptr, left_rumble: u16, right_rumble: u16, duration_ms: u32) u8;
 
 # --- rect intersection (SDL_rect.h) ---
 #
