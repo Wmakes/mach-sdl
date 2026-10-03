@@ -1,45 +1,48 @@
-# native message box dialogs
+# native message boxes (sdl.msgbox)
 #
-# simple one-shot dialogs via the OS's own native UI (Win32 MessageBox,
-# macOS NSAlert, GTK on linux). useful for fatal errors, confirmation
-# before a destructive action, or anything where a terminal message would
-# be missed by a non-developer user. blocks until the user clicks OK.
-#
-# window param is optional (pass nil via a zero Window handle if no window
-# exists yet, e.g. during init failure) -- the dialog becomes top-level
-# rather than parented to a window.
+# one-shot dialogs through the OS's own UI (Win32 MessageBox, NSAlert, GTK).
+# useful for fatal errors or a confirmation where a terminal message would be
+# missed. blocks until the user clicks OK.
 
 use sdl.c;
+use sdl.error;
 use sdl.window.Window;
-use std.types.bool.bool;
+use std.types.error.err;
 use std.types.string.str;
 
-pub val KIND_ERROR: u32 = c.MESSAGEBOX_ERROR;
-pub val KIND_WARN:  u32 = c.MESSAGEBOX_WARNING;
-pub val KIND_INFO:  u32 = c.MESSAGEBOX_INFORMATION;
-
-# show a simple message box with a title, message, and an OK button
+# what kind of dialog to show
 # ---
-# kind:    KIND_ERROR / KIND_WARN / KIND_INFO
+# info:  informational
+# warn:  warning
+# error: error
+pub tag Kind: u8 {
+    info;
+    warn;
+    error;
+}
+
+# turn an SDL bool result into err[error.Error]
+# ---
+# succeeded: the u8 result of an SDL call, nonzero on success
+fun to_err(succeeded: u8) err[error.Error] {
+    if (succeeded == 0) {
+        ret err[error.Error].err{ error.Error.failed{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# show a message box with a title, a message and an OK button
+# ---
+# kind:    the kind of dialog
 # title:   dialog title
 # message: body text
-# window:  parent window, or a Window with a nil handle for no parent
-# ret:     true on success; false if the platform couldn't show a dialog
-pub fun show(kind: u32, title: str, message: str, window: Window) bool {
-    ret c.SDL_ShowSimpleMessageBox(kind, title, message, window.handle) != 0;
-}
-
-# show an error dialog -- shorthand for show(KIND_ERROR, ...)
-pub fun error(title: str, message: str, window: Window) bool {
-    ret show(KIND_ERROR, title, message, window);
-}
-
-# show a warning dialog -- shorthand for show(KIND_WARN, ...)
-pub fun warn(title: str, message: str, window: Window) bool {
-    ret show(KIND_WARN, title, message, window);
-}
-
-# show an info dialog -- shorthand for show(KIND_INFO, ...)
-pub fun info(title: str, message: str, window: Window) bool {
-    ret show(KIND_INFO, title, message, window);
+# win:     parent window; pass an invalid Window (nil handle) for a
+#          parentless box, e.g. when init failed before any window existed
+# ret:     ok, or error.Error.failed if the platform could not show a dialog
+#          (text from error.message())
+pub fun show(kind: Kind, title: str, message: str, win: Window) err[error.Error] {
+    var flags: u32 = c.MESSAGEBOX_INFORMATION;
+    if (sel kind.warn)  { flags = c.MESSAGEBOX_WARNING; }
+    if (sel kind.error) { flags = c.MESSAGEBOX_ERROR; }
+    ret to_err(c.SDL_ShowSimpleMessageBox(flags, title, message, win.handle));
 }

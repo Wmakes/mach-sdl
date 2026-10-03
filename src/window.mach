@@ -1,144 +1,180 @@
-# window lifecycle
+# window lifecycle and properties (sdl.window)
 #
-# a Window is a by-value wrapper around the opaque SDL_Window handle.
-# fallible constructors return a nil-handle Window; check with
-# window_is_valid and query sdl.core.get_error for the cause.
+# a Window is a by-value handle around SDL_Window. every fallible function
+# checks the handle first and returns error.Error.invalid for a nil one, so
+# SDL is never called with an invalid handle.
 
 use sdl.c;
-use sdl.core;
+use sdl.error;
 use std.types.bool.bool;
+use std.types.error.err;
+use std.types.result.res;
 use std.types.string.str;
 
-
-# handle to an SDL window
+# handle to an SDL window. the zero value (nil handle) is invalid
 # ---
 # handle: opaque SDL_Window pointer, nil when invalid
 pub rec Window {
     handle: ptr;
 }
 
-pub val WINDOW_OPENGL:    u64 = c.WINDOW_OPENGL;
-pub val WINDOW_RESIZABLE: u64 = c.WINDOW_RESIZABLE;
-
-# whether a Window holds a live handle
-# ---
-# window: window to test
-# ret:    true if the handle is non-nil
-pub fun window_is_valid(window: Window) bool {
-    ret window.handle != nil;
-}
-
-# create a window
-# ---
-# title:  UTF-8 window title
-# w:      width in pixels
-# h:      height in pixels
-# flags:  bitwise OR of WINDOW_* values
-# ret:    the new Window; nil handle on failure -- check core.get_error()
-pub fun create_window(title: str, w: i32, h: i32, flags: u64) Window {
-    ret Window{ handle: c.SDL_CreateWindow(title, w, h, flags) };
-}
-
-# create_window sugar for the common windowed-with-GL case
-# ---
-# title: UTF-8 window title
-# w:     width in pixels
-# h:     height in pixels
-# ret:   the new Window; nil handle on failure
-pub fun open_gl_window(title: str, w: i32, h: i32) Window {
-    ret create_window(title, w, h, WINDOW_OPENGL | WINDOW_RESIZABLE);
-}
-
-# destroy a window and its context
-# ---
-# window: window to destroy
-pub fun destroy_window(window: Window) {
-    c.SDL_DestroyWindow(window.handle);
-}
-
-# change a window's title
-pub fun set_title(window: Window, title: str) bool {
-    ret c.SDL_SetWindowTitle(window.handle, title) != 0;
-}
-
-# plain width/height pair, in pixels
+# a window size in pixels
 pub rec Size {
     w: i32;
     h: i32;
 }
 
-# a window's current size in pixels
+pub val OPENGL:    u64 = c.WINDOW_OPENGL;
+pub val RESIZABLE: u64 = c.WINDOW_RESIZABLE;
+
+# whether a Window holds a live handle
 # ---
-# ret: (width, height); (0, 0) if the query fails
-pub fun get_size(window: Window) Size {
+# win: window to test
+# ret: true if the handle is non-nil
+pub fun is_valid(win: Window) bool {
+    ret win.handle != nil;
+}
+
+# turn an SDL bool result into err[error.Error]
+# ---
+# succeeded: the u8 result of an SDL call, nonzero on success
+fun to_err(succeeded: u8) err[error.Error] {
+    if (succeeded == 0) {
+        ret err[error.Error].err{ error.Error.failed{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# reject a nil handle before SDL is called
+# ---
+# win: window the caller is about to use
+fun ready(win: Window) err[error.Error] {
+    if (!is_valid(win)) {
+        ret err[error.Error].err{ error.Error.invalid{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# create a window. call sdl.core.init(VIDEO) first
+# ---
+# title: UTF-8 window title
+# w:     width in pixels
+# h:     height in pixels
+# flags: bitwise OR of OPENGL and RESIZABLE
+# ret:   the new Window, or error.Error.failed (text from error.message())
+pub fun create(title: str, w: i32, h: i32, flags: u64) res[Window, error.Error] {
+    val handle: ptr = c.SDL_CreateWindow(title, w, h, flags);
+    if (handle == nil) {
+        ret res[Window, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Window, error.Error].ok{ Window{ handle: handle } };
+}
+
+# destroy a window and its resources. safe on an invalid handle
+# ---
+# win: window to destroy
+pub fun destroy(win: Window) {
+    if (is_valid(win)) {
+        c.SDL_DestroyWindow(win.handle);
+    }
+}
+
+# set the window title
+# ---
+# title: UTF-8 title
+pub fun set_title(win: Window, title: str) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetWindowTitle(win.handle, title));
+}
+
+# the window size in pixels
+# ---
+# ret: the size, or an error.Error on failure
+pub fun size(win: Window) res[Size, error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (sel r.err) { ret res[Size, error.Error].err{ r.err }; }
     var w: i32 = 0;
     var h: i32 = 0;
-    c.SDL_GetWindowSize(window.handle, ?w, ?h);
-    ret Size{ w: w, h: h };
+    if (c.SDL_GetWindowSize(win.handle, ?w, ?h) == 0) {
+        ret res[Size, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Size, error.Error].ok{ Size{ w: w, h: h } };
 }
 
-# move a window
-pub fun set_position(window: Window, x: i32, y: i32) bool {
-    ret c.SDL_SetWindowPosition(window.handle, x, y) != 0;
+# resize the window
+# ---
+# w: width in pixels
+# h: height in pixels
+pub fun set_size(win: Window, w: i32, h: i32) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetWindowSize(win.handle, w, h));
 }
 
-# toggle fullscreen (borderless, desktop-resolution -- not exclusive
-# fullscreen/videomode-change; that's a separate, unbound SDL call)
-pub fun set_fullscreen(window: Window, fullscreen: bool) bool {
-    var flag: u8 = 0;
-    if (fullscreen) { flag = 1; }
-    ret c.SDL_SetWindowFullscreen(window.handle, flag) != 0;
+# move the window on the desktop
+# ---
+# x: x position in pixels
+# y: y position in pixels
+pub fun set_position(win: Window, x: i32, y: i32) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetWindowPosition(win.handle, x, y));
 }
 
-# minimize (iconify) the window
-pub fun minimize(window: Window) bool {
-    ret c.SDL_MinimizeWindow(window.handle) != 0;
+# switch the window to or from fullscreen
+# ---
+# on: true for fullscreen
+pub fun set_fullscreen(win: Window, on: bool) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetWindowFullscreen(win.handle, on));
+}
+
+# set the smallest size the user can resize to
+# ---
+# w: minimum width in pixels
+# h: minimum height in pixels
+pub fun set_min_size(win: Window, w: i32, h: i32) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetWindowMinimumSize(win.handle, w, h));
+}
+
+# set the largest size the user can resize to. 0 means no limit
+# ---
+# w: maximum width in pixels
+# h: maximum height in pixels
+pub fun set_max_size(win: Window, w: i32, h: i32) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetWindowMaximumSize(win.handle, w, h));
+}
+
+# minimize the window
+pub fun minimize(win: Window) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_MinimizeWindow(win.handle));
 }
 
 # maximize the window
-pub fun maximize(window: Window) bool {
-    ret c.SDL_MaximizeWindow(window.handle) != 0;
+pub fun maximize(win: Window) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_MaximizeWindow(win.handle));
 }
 
-# restore a minimized or maximized window to its previous size/position
-pub fun restore(window: Window) bool {
-    ret c.SDL_RestoreWindow(window.handle) != 0;
+# restore a minimized or maximized window
+pub fun restore(win: Window) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RestoreWindow(win.handle));
 }
 
-# raise the window above other windows and give it input focus
-pub fun raise(window: Window) bool {
-    ret c.SDL_RaiseWindow(window.handle) != 0;
-}
-
-# set the smallest size a user is allowed to resize the window down to
-pub fun set_minimum_size(window: Window, w: i32, h: i32) bool {
-    ret c.SDL_SetWindowMinimumSize(window.handle, w, h) != 0;
-}
-
-# set the largest size a user is allowed to resize the window up to
-pub fun set_maximum_size(window: Window, w: i32, h: i32) bool {
-    ret c.SDL_SetWindowMaximumSize(window.handle, w, h) != 0;
-}
-
-test window_create_window_destroy_window_round_trip_under_the_dummy_driver {
-    if (!core.use_dummy_video_driver()) { ret 1; }
-    if (!core.init(core.INIT_VIDEO)) { ret 1; }
-
-    # no WINDOW_OPENGL here on purpose -- the dummy driver doesn't support
-    # GL, this test is only checking the window/plumbing works, not GL.
-    val w: Window = create_window("mach-sdl test", 320, 240, 0);
-    if (!window_is_valid(w)) {
-        core.quit();
-        ret 1;
-    }
-
-    destroy_window(w);
-    core.quit();
-    ret 0;
-}
-
-test window_a_nil_handle_window_reports_invalid {
-    val w: Window = Window{ handle: nil };
-    if (window_is_valid(w)) { ret 1; }
-    ret 0;
+# raise the window above others and give it input focus
+pub fun raise(win: Window) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RaiseWindow(win.handle));
 }

@@ -1,0 +1,21 @@
+# 8-bit RGBA color (sdl.color)
+#
+# a plain value record with the layout of SDL_Color (four bytes, no padding).
+
+# an RGBA color, each channel 0 to 255
+# ---
+# r: red
+# g: green
+# b: blue
+# a: alpha, 255 is opaque
+pub rec Color {
+    r: u8;
+    g: u8;
+    b: u8;
+    a: u8;
+}
+
+test color__layout {
+    if ($size_of(Color) != 4) { ret 1; }
+    ret 0;
+}

@@ -1,0 +1,29 @@
+# shared error type for every sdl module
+#
+# the closed domain of failures this binding reports. the SDL error text is
+# not part of the tag (tags carry closed domains, never strings); read it
+# with message() right after the failing call.
+
+use sdl.c;
+use std.types.string.str;
+
+# why an SDL call did not complete
+# ---
+# failed:      SDL reported failure; the text is available from message()
+# invalid:     a nil or invalid handle was rejected before SDL was called
+# unsupported: the function or feature is not available on this platform
+pub tag Error: u8 {
+    failed;
+    invalid;
+    unsupported;
+}
+
+# the SDL error text of the last failed call on this thread
+#
+# the string is SDL-owned and borrowed. it is valid until the next SDL call
+# on this thread, so copy it first if it must outlive that call.
+# ---
+# ret: a UTF-8 string; never nil, but may be empty
+pub fun message() str {
+    ret c.SDL_GetError();
+}

@@ -1,58 +1,70 @@
-# random number generation
+# random numbers (sdl.rand)
 #
-# wraps SDL's own seeded RNG (SDL_srand/SDL_rand/SDL_randf). SDL's RNG is
-# not cryptographically secure, but it's reproducible (same seed gives the
-# same sequence) and good enough for games: enemy spawns, procedural maps,
-# particle variation, etc.
+# wraps SDL's own seeded RNG (SDL_srand, SDL_rand, SDL_randf). it is not
+# cryptographically secure, but it is reproducible (the same seed gives the
+# same sequence) and good enough for games: spawns, maps, particle variation.
+# none of these can fail, so none returns a result type.
 
 use sdl.c;
 use std.types.bool.bool;
 use std.types.size.usize;
 
-# seed the RNG -- call once at startup, e.g. from sdl.timer.ticks_ns()
-# for a time-based seed, or a fixed value for a reproducible run.
+# seed the generator. call once at startup, e.g. with sdl.timer.ticks_ns()
+# for a time-based seed or a fixed value for a reproducible run
+# ---
+# s: the seed
 pub fun seed(s: u64) {
     c.SDL_srand(s);
 }
 
-# a random i32 in [0, n)
+# a random integer in [0, n)
 # ---
-# n: exclusive upper bound; must be > 0
-pub fun rand_int(n: i32) i32 {
+# n: exclusive upper bound, must be greater than 0
+# ret: the number
+pub fun int(n: i32) i32 {
     ret c.SDL_rand(n);
 }
 
-# a random f32 in [0.0, 1.0)
-pub fun rand_f32() f32 {
+# a random float in [0.0, 1.0)
+# ---
+# ret: the number
+pub fun f32() f32 {
     ret c.SDL_randf();
 }
 
-# a random f32 in [lo, hi)
-pub fun rand_range(lo: f32, hi: f32) f32 {
+# a random float in [lo, hi)
+# ---
+# lo: inclusive lower bound
+# hi: exclusive upper bound
+# ret: the number
+pub fun range(lo: f32, hi: f32) f32 {
     ret lo + c.SDL_randf() * (hi - lo);
 }
 
-# a random bool, roughly 50/50
-pub fun rand_bool() bool {
+# a coin flip, roughly 50/50. named flip because a function called bool
+# would clash with the bool type this module imports
+# ---
+# ret: true or false
+pub fun flip() bool {
     ret c.SDL_rand(2) == 0;
 }
 
-test rand_rand_int_stays_in_range_over_many_calls {
+test rand_int_stays_in_range_over_many_calls {
     seed(42);
     var i: usize = 0;
     for (i < 1000) {
-        val v: i32 = rand_int(100);
+        val v: i32 = int(100);
         if (v < 0 || v >= 100) { ret 1; }
         i = i + 1;
     }
     ret 0;
 }
 
-test rand_rand_f32_stays_in_0_0_1_0_over_many_calls {
+test rand_f32_stays_in_0_0_1_0_over_many_calls {
     seed(42);
     var i: usize = 0;
     for (i < 1000) {
-        val v: f32 = rand_f32();
+        val v: f32 = f32();
         if (v < 0.0 || v >= 1.0) { ret 1; }
         i = i + 1;
     }
@@ -61,12 +73,12 @@ test rand_rand_f32_stays_in_0_0_1_0_over_many_calls {
 
 test rand_same_seed_gives_same_sequence {
     seed(12345);
-    val a: i32 = rand_int(1000000);
-    val b: i32 = rand_int(1000000);
+    val a: i32 = int(1000000);
+    val b: i32 = int(1000000);
 
     seed(12345);
-    val a2: i32 = rand_int(1000000);
-    val b2: i32 = rand_int(1000000);
+    val a2: i32 = int(1000000);
+    val b2: i32 = int(1000000);
 
     if (a != a2) { ret 1; }
     if (b != b2) { ret 1; }

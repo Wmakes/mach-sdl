@@ -1,17 +1,30 @@
-# timing
+# timing (sdl.timer)
 #
-# raw millisecond/nanosecond tick counters, a delay function, and Clock --
-# the thing every game loop actually needs: seconds elapsed since the
-# last frame, not a raw counter value you have to convert yourself.
+# raw millisecond and nanosecond tick counters, a delay, and Clock: the
+# thing a game loop actually needs, seconds elapsed since the last frame
+# instead of a raw counter you convert yourself.
 
 use sdl.c;
 
+# a running delta-time clock, backed by the high-resolution performance
+# counter. its units are not fixed at milliseconds the way ticks_ms is, so
+# tick converts with SDL_GetPerformanceFrequency
+# ---
+# last: performance-counter value at the last tick call
+pub rec Clock {
+    last: u64;
+}
+
 # milliseconds since SDL library init
+# ---
+# ret: the millisecond count
 pub fun ticks_ms() u64 {
     ret c.SDL_GetTicks();
 }
 
-# nanoseconds since SDL library init -- higher resolution than ticks_ms
+# nanoseconds since SDL library init. higher resolution than ticks_ms
+# ---
+# ret: the nanosecond count
 pub fun ticks_ns() u64 {
     ret c.SDL_GetTicksNS();
 }
@@ -23,40 +36,30 @@ pub fun delay(ms: u32) {
     c.SDL_Delay(ms);
 }
 
-# a running delta-time clock, backed by the high-resolution performance
-# counter (not ticks_ms -- this is the one you actually want for frame
-# timing, since SDL_GetPerformanceFrequency's units aren't fixed at
-# milliseconds the way SDL_GetTicks's are).
-# ---
-# last: performance-counter value at the last tick() call
-pub rec Clock {
-    last: u64;
-}
-
 # start a clock, timed from right now
 # ---
-# ret: a Clock ready for its first tick() call
-pub fun new_clock() Clock {
+# ret: a Clock ready for its first tick
+pub fun clock() Clock {
     ret Clock{ last: c.SDL_GetPerformanceCounter() };
 }
 
-# seconds elapsed since this clock's last tick() (or since new_clock(),
-# on the first call) -- call this once per frame and use the result to
-# scale movement/physics so speed doesn't depend on framerate.
+# seconds elapsed since this clock's previous tick (or since clock(), on the
+# first call). call it once per frame and scale movement by the result so
+# speed does not depend on the frame rate
 # ---
-# clock: clock to advance
-# ret:   elapsed seconds as f64
-pub fun tick(clock: *Clock) f64 {
+# clk: clock to advance
+# ret: elapsed seconds
+pub fun tick(clk: *Clock) f64 {
     val now:  u64 = c.SDL_GetPerformanceCounter();
     val freq: u64 = c.SDL_GetPerformanceFrequency();
 
-    val elapsed: f64 = ((now - (@clock).last)::f64) / (freq::f64);
-    (@clock).last = now;
+    val elapsed: f64 = ((now - (@clk).last)::f64) / (freq::f64);
+    (@clk).last = now;
     ret elapsed;
 }
 
 test timer_a_fresh_clock_s_first_tick_is_not_negative_or_absurd {
-    var clk: Clock = new_clock();
+    var clk: Clock = clock();
     delay(5);
     val dt: f64 = tick(?clk);
     if (dt < 0.0) { ret 1; }

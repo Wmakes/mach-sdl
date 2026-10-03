@@ -1,0 +1,94 @@
+# WAV loading (sdl.wav)
+#
+# SDL reads the file and decodes it; the binding only passes the path in and
+# hands the result back. a Clip is the decoded sample data plus its format,
+# channel count and frequency, ready to feed to an audio Stream.
+#
+# the data is an SDL heap allocation owned by the Clip: release it with
+# destroy. a Stream made with open gets its own copy of the samples, so the
+# Clip can be destroyed right after open.
+
+use sdl.audio;
+use sdl.c;
+use sdl.error;
+use std.types.bool.bool;
+use std.types.error.err;
+use std.types.option.opt;
+use std.types.result.res;
+use std.types.size.usize;
+use std.types.string.str;
+
+# decoded WAV audio. the zero value (nil data) is invalid
+# ---
+# data:     SDL-allocated sample bytes, nil when invalid
+# len:      length of data in bytes
+# format:   sample format of data
+# channels: channel count
+# freq:     sample rate in Hz
+pub rec Clip {
+    data:     ptr;
+    len:      u32;
+    format:   audio.Format;
+    channels: i32;
+    freq:     i32;
+}
+
+# whether a Clip holds sample data
+# ---
+# clip: clip to test
+# ret:  true if the data pointer is non-nil
+pub fun is_valid(clip: Clip) bool {
+    ret clip.data != nil;
+}
+
+# load a WAV file
+# ---
+# path: path to a .wav file
+# ret:  the new Clip, or error.Error.unsupported if the file decodes to a
+#       sample format audio.Format does not cover, or error.Error.failed
+#       (text from error.message())
+pub fun load(path: str) res[Clip, error.Error] {
+    var spec: c.AudioSpec = c.AudioSpec{ format: 0, channels: 0, freq: 0 };
+    var buf: ptr = nil;
+    var len: u32 = 0;
+    if (c.SDL_LoadWAV(path, ?spec, ?buf, ?len) == 0) {
+        ret res[Clip, error.Error].err{ error.Error.failed{} };
+    }
+    val fmt: opt[audio.Format] = audio.format_from_raw(spec.format);
+    if (!sel fmt.some) {
+        c.SDL_free(buf);
+        ret res[Clip, error.Error].err{ error.Error.unsupported{} };
+    }
+    ret res[Clip, error.Error].ok{ Clip{ data: buf, len: len, format: fmt.some, channels: spec.channels, freq: spec.freq } };
+}
+
+# release a clip's sample data. safe on an invalid clip
+# ---
+# clip: clip to destroy
+pub fun destroy(clip: Clip) {
+    if (is_valid(clip)) {
+        c.SDL_free(clip.data);
+    }
+}
+
+# open a stream on the default playback device that matches the clip, and
+# queue all of its samples. the stream starts paused: call audio.resume
+# ---
+# clip: clip to play; it can be destroyed once this returns
+# ret:  the new Stream, or error.Error.invalid for an invalid clip, or
+#       error.Error.failed (text from error.message())
+pub fun open(clip: Clip) res[audio.Stream, error.Error] {
+    if (!is_valid(clip)) {
+        ret res[audio.Stream, error.Error].err{ error.Error.invalid{} };
+    }
+    val opened: res[audio.Stream, error.Error] = audio.open(clip.format, clip.channels, clip.freq);
+    if (sel opened.err) {
+        ret res[audio.Stream, error.Error].err{ opened.err };
+    }
+    val queued: err[error.Error] = audio.put(opened.ok, clip.data::*u8, clip.len::usize);
+    if (sel queued.err) {
+        audio.close(opened.ok);
+        ret res[audio.Stream, error.Error].err{ queued.err };
+    }
+    ret opened;
+}

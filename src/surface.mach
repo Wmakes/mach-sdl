@@ -1,0 +1,51 @@
+# surfaces (sdl.surface)
+#
+# a Surface is a by-value handle around SDL_Surface, a block of pixels in
+# memory. it is the stage between an image file and a Texture: SDL reads the
+# file, the binding only passes the parameters. every fallible function
+# checks its handle first and returns error.Error.invalid for a nil one.
+#
+# only BMP is read, because SDL3's core reads nothing else. other formats
+# need SDL_image, which is not bound here.
+
+use sdl.c;
+use sdl.error;
+use std.types.bool.bool;
+use std.types.result.res;
+use std.types.string.str;
+
+# handle to an SDL surface. the zero value (nil handle) is invalid
+# ---
+# handle: opaque SDL_Surface pointer, nil when invalid
+pub rec Surface {
+    handle: ptr;
+}
+
+# whether a Surface holds a live handle
+# ---
+# surf: surface to test
+# ret:  true if the handle is non-nil
+pub fun is_valid(surf: Surface) bool {
+    ret surf.handle != nil;
+}
+
+# load a BMP image file into a surface
+# ---
+# path: path to a .bmp file
+# ret:  the new Surface, or error.Error.failed (text from error.message())
+pub fun load_bmp(path: str) res[Surface, error.Error] {
+    val handle: ptr = c.SDL_LoadBMP(path);
+    if (handle == nil) {
+        ret res[Surface, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Surface, error.Error].ok{ Surface{ handle: handle } };
+}
+
+# destroy a surface. safe on an invalid handle
+# ---
+# surf: surface to destroy
+pub fun destroy(surf: Surface) {
+    if (is_valid(surf)) {
+        c.SDL_DestroySurface(surf.handle);
+    }
+}

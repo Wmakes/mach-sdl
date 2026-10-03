@@ -266,8 +266,8 @@ pub ext fun SDL_RenderPresent(renderer: ptr) u8;
 #
 # minimal playback path: open a stream bound straight to the default
 # output device, push raw samples into it, resume (streams start
-# paused). no callback-driven playback, no capture/recording, no
-# multi-device enumeration -- deferred until something needs them.
+# paused). no callback-driven playback and no capture/recording. device
+# enumeration and WAV loading are bound below (sdl.audio, sdl.wav).
 
 pub val AUDIO_DEVICE_DEFAULT_PLAYBACK: u32 = 0xFFFFFFFF;
 
@@ -275,7 +275,10 @@ pub val AUDIO_DEVICE_DEFAULT_PLAYBACK: u32 = 0xFFFFFFFF;
 # for x86_64/aarch64, which are effectively always little-endian in
 # practice. computed from SDL_DEFINE_AUDIO_FORMAT's bit-packing, not
 # guessed: (signed<<15)|(bigendian<<12)|(float<<8)|bitsize.
+pub val AUDIO_FORMAT_U8:  u32 = 0x0008;
+pub val AUDIO_FORMAT_S8:  u32 = 0x8008;
 pub val AUDIO_FORMAT_S16: u32 = 0x8010;
+pub val AUDIO_FORMAT_S32: u32 = 0x8020;
 pub val AUDIO_FORMAT_F32: u32 = 0x8120;
 
 # SDL_AudioSpec: format (enum, 4 bytes) + channels (int, 4) + freq (int,
@@ -313,6 +316,10 @@ pub ext fun SDL_GetAudioStreamAvailable(stream: ptr) i32;
 pub ext fun SDL_ClearAudioStream(stream: ptr) u8;
 pub ext fun SDL_GetAudioPlaybackDevices(count: *i32) ptr;
 pub ext fun SDL_GetAudioDeviceName(devid: u32) *u8;
+
+# SDL_LoadWAV reads a WAV file: it fills spec, hands back a heap buffer in
+# audio_buf (caller must SDL_free it) and its byte length in audio_len.
+pub ext fun SDL_LoadWAV(path: *u8, spec: *AudioSpec, audio_buf: *ptr, audio_len: *u32) u8;
 
 # --- textures (SDL_surface.h / SDL_render.h) ---
 #
@@ -368,6 +375,12 @@ pub ext fun SDL_GetTextureScaleMode(texture: ptr, scale_mode: *u32) u8;
 
 pub ext fun SDL_SetWindowTitle(window: ptr, title: *u8) u8;
 pub ext fun SDL_GetWindowSize(window: ptr, w: *i32, h: *i32) u8;
+pub ext fun SDL_SetWindowSize(window: ptr, w: i32, h: i32) u8;
+
+# --- keyboard state (SDL_keyboard.h) ---
+# returns SDL's own key state array, indexed by scancode; numkeys receives its length
+pub ext fun SDL_GetKeyboardState(numkeys: *i32) ptr;
+pub ext fun SDL_GetModState() u16;
 pub ext fun SDL_SetWindowPosition(window: ptr, x: i32, y: i32) u8;
 pub ext fun SDL_SetWindowFullscreen(window: ptr, fullscreen: u8) u8;
 
@@ -415,13 +428,8 @@ pub ext fun SDL_SetRenderDrawBlendMode(renderer: ptr, blend_mode: u32) u8;
 #
 # nil restores the window itself as the target.
 #
-# KNOWN GAP: a texture passed here must have been created with
-# render-target access (SDL_CreateTexture + SDL_TEXTUREACCESS_TARGET on
-# the C side). This binding only creates textures via
-# renderer.load_texture (SDL_LoadBMP + SDL_CreateTextureFromSurface),
-# which does NOT grant render-target access -- a lower-level
-# SDL_CreateTexture binding would be needed before render-to-texture is
-# actually usable here. flagging rather than assuming it works.
+# a texture passed here must have been created with render-target access
+# (SDL_CreateTexture + TEXTUREACCESS_TARGET). sdl.texture.create does that.
 
 pub ext fun SDL_SetRenderTarget(renderer: ptr, texture: ptr) u8;
 

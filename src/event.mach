@@ -1,0 +1,192 @@
+# event queue with typed events (sdl.event)
+#
+# nothing from sdl.c leaves this module. poll() decodes one raw SDL event
+# into the Event tag below, and returns none when the queue is empty.
+
+use sdl.c;
+use std.types.bool.bool;
+use std.types.option.opt;
+use std.types.string.str;
+
+# window-level event: close request, resize, focus changes
+pub rec WindowEvent {
+    window: u32;
+    width:  i32;
+    height: i32;
+}
+
+# keyboard press or release
+# ---
+# scancode: physical key, compare with the key module constants
+# mods:     modifier bits, see key.MOD_*
+# repeat:   true when the press is an auto-repeat
+pub rec KeyEvent {
+    window:   u32;
+    scancode: u32;
+    mods:     u16;
+    repeat:   bool;
+}
+
+# mouse movement
+# ---
+# x, y:   position in window coordinates
+# dx, dy: movement since the last event
+# buttons: bitmask of buttons held, see mouse.LEFT and friends
+pub rec MouseMotion {
+    window:  u32;
+    x:       f32;
+    y:       f32;
+    dx:      f32;
+    dy:      f32;
+    buttons: u32;
+}
+
+# mouse button press or release
+# ---
+# button: which button, see mouse.LEFT and friends
+# clicks: 1 for a single click, 2 for a double click, and so on
+pub rec MouseButton {
+    window: u32;
+    x:      f32;
+    y:      f32;
+    button: u8;
+    clicks: u8;
+}
+
+# mouse wheel movement
+# ---
+# dx, dy: scroll amount (positive is up or right)
+pub rec MouseWheel {
+    window: u32;
+    x:      f32;
+    y:      f32;
+    dx:     f32;
+    dy:     f32;
+}
+
+# text typed by the user. SDL only sends these after text input is started,
+# which is not wrapped yet
+# ---
+# text: borrowed; valid until the next poll()
+pub rec TextInput {
+    window: u32;
+    text:   str;
+}
+
+# one event from the queue
+# ---
+# unknown:  an SDL event type this binding does not map yet, raw type value
+pub tag Event: u8 {
+    unknown: u32;
+    quit;
+    window_close: WindowEvent;
+    window_resized: WindowEvent;
+    window_focus_gained: WindowEvent;
+    window_focus_lost: WindowEvent;
+    key_down: KeyEvent;
+    key_up: KeyEvent;
+    mouse_motion: MouseMotion;
+    mouse_button_down: MouseButton;
+    mouse_button_up: MouseButton;
+    mouse_wheel: MouseWheel;
+    text_input: TextInput;
+}
+
+# copy the window fields out of a raw window event
+fun window_event(raw: *c.Event) WindowEvent {
+    val w: *c.WindowEvent = raw::*c.WindowEvent;
+    ret WindowEvent{
+        window: (@w).window_id,
+        width:  (@w).data1,
+        height: (@w).data2,
+    };
+}
+
+# copy the fields out of a raw key event
+fun key_event(raw: *c.Event) KeyEvent {
+    val k: *c.KeyboardEvent = raw::*c.KeyboardEvent;
+    ret KeyEvent{
+        window:   (@k).window_id,
+        scancode: (@k).scancode,
+        mods:     (@k).mod_,
+        repeat:   (@k).repeat,
+    };
+}
+
+# copy the fields out of a raw mouse motion event
+fun motion_event(raw: *c.Event) MouseMotion {
+    val m: *c.MouseMotionEvent = raw::*c.MouseMotionEvent;
+    ret MouseMotion{
+        window:  (@m).window_id,
+        x:       (@m).x,
+        y:       (@m).y,
+        dx:      (@m).xrel,
+        dy:      (@m).yrel,
+        buttons: (@m).state,
+    };
+}
+
+# copy the fields out of a raw mouse button event
+fun button_event(raw: *c.Event) MouseButton {
+    val b: *c.MouseButtonEvent = raw::*c.MouseButtonEvent;
+    ret MouseButton{
+        window: (@b).window_id,
+        x:      (@b).x,
+        y:      (@b).y,
+        button: (@b).button,
+        clicks: (@b).clicks,
+    };
+}
+
+# copy the fields out of a raw mouse wheel event. SDL's x/y are the scroll
+# amount and mouse_x/mouse_y the cursor position; they are renamed here
+fun wheel_event(raw: *c.Event) MouseWheel {
+    val wh: *c.MouseWheelEvent = raw::*c.MouseWheelEvent;
+    ret MouseWheel{
+        window: (@wh).window_id,
+        x:      (@wh).mouse_x,
+        y:      (@wh).mouse_y,
+        dx:     (@wh).x,
+        dy:     (@wh).y,
+    };
+}
+
+# copy the text out of a raw text input event. the text is SDL's buffer,
+# borrowed until the next poll()
+fun text_event(raw: *c.Event) TextInput {
+    val t: *c.TextInputEvent = raw::*c.TextInputEvent;
+    val text: *u8 = (@t).text;
+    ret TextInput{
+        window: (@t).window_id,
+        text:   text::str,
+    };
+}
+
+# decode one raw SDL event into the Event tag
+fun decode(raw: *c.Event) Event {
+    val t: u32 = (@raw).event_type;
+    if (t == c.EVENT_QUIT) { ret Event.quit{}; }
+    if (t == c.EVENT_WINDOW_CLOSE_REQUESTED) { ret Event.window_close{ window_event(raw) }; }
+    if (t == c.EVENT_WINDOW_RESIZED) { ret Event.window_resized{ window_event(raw) }; }
+    if (t == c.EVENT_WINDOW_FOCUS_GAINED) { ret Event.window_focus_gained{ window_event(raw) }; }
+    if (t == c.EVENT_WINDOW_FOCUS_LOST) { ret Event.window_focus_lost{ window_event(raw) }; }
+    if (t == c.EVENT_KEY_DOWN) { ret Event.key_down{ key_event(raw) }; }
+    if (t == c.EVENT_KEY_UP) { ret Event.key_up{ key_event(raw) }; }
+    if (t == c.EVENT_MOUSE_MOTION) { ret Event.mouse_motion{ motion_event(raw) }; }
+    if (t == c.EVENT_MOUSE_BUTTON_DOWN) { ret Event.mouse_button_down{ button_event(raw) }; }
+    if (t == c.EVENT_MOUSE_BUTTON_UP) { ret Event.mouse_button_up{ button_event(raw) }; }
+    if (t == c.EVENT_MOUSE_WHEEL) { ret Event.mouse_wheel{ wheel_event(raw) }; }
+    if (t == c.EVENT_TEXT_INPUT) { ret Event.text_input{ text_event(raw) }; }
+    ret Event.unknown{ t };
+}
+
+# take the next event from the queue
+# ---
+# ret: the event, or none when the queue is empty
+pub fun poll() opt[Event] {
+    var raw: c.Event;
+    if (c.SDL_PollEvent(?raw) == 0) {
+        ret opt[Event].none{};
+    }
+    ret opt[Event].some{ decode(?raw) };
+}

@@ -1,0 +1,255 @@
+# textures (sdl.texture)
+#
+# a Texture is a by-value handle around SDL_Texture, owned by the Renderer it
+# was made with. destroying the renderer also destroys its textures. every
+# fallible function checks the handle first and returns error.Error.invalid
+# for a nil one.
+
+use sdl.c;
+use sdl.color.Color;
+use sdl.error;
+use sdl.renderer;
+use sdl.surface;
+use std.types.bool.bool;
+use std.types.error.err;
+use std.types.result.res;
+use std.types.string.str;
+
+# handle to an SDL texture. the zero value (nil handle) is invalid. the
+# record itself lives in sdl.renderer (see the note there) and is re-exported
+fwd renderer.Texture;
+
+# a texture size in pixels
+pub rec Size {
+    w: f32;
+    h: f32;
+}
+
+# how a texture is sampled when drawn at a different size
+# ---
+# nearest: nearest pixel, hard edges
+# linear:  linear filtering, smooth edges
+pub tag ScaleMode: u8 {
+    nearest;
+    linear;
+}
+
+# turn an SDL bool result into err[error.Error]
+# ---
+# succeeded: the u8 result of an SDL call, nonzero on success
+fun to_err(succeeded: u8) err[error.Error] {
+    if (succeeded == 0) {
+        ret err[error.Error].err{ error.Error.failed{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# whether a Texture holds a live handle
+# ---
+# tex: texture to test
+# ret: true if the handle is non-nil
+pub fun is_valid(tex: Texture) bool {
+    ret tex.handle != nil;
+}
+
+# reject a nil texture before SDL is called
+# ---
+# tex: texture the caller is about to use
+fun ready(tex: Texture) err[error.Error] {
+    if (!is_valid(tex)) {
+        ret err[error.Error].err{ error.Error.invalid{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# create an empty texture that can be drawn into with renderer.set_target
+#
+# the pixel format is fixed to RGBA8888; SDL does the allocation.
+# ---
+# rend: renderer that will own the texture
+# w:    width in pixels
+# h:    height in pixels
+# ret:  the new Texture, or error.Error.invalid for a nil renderer, or
+#       error.Error.failed (text from error.message())
+pub fun create(rend: renderer.Renderer, w: i32, h: i32) res[Texture, error.Error] {
+    if (!renderer.is_valid(rend)) {
+        ret res[Texture, error.Error].err{ error.Error.invalid{} };
+    }
+    val handle: ptr = c.SDL_CreateTexture(rend.handle, c.PIXELFORMAT_RGBA8888, c.TEXTUREACCESS_TARGET, w, h);
+    if (handle == nil) {
+        ret res[Texture, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Texture, error.Error].ok{ Texture{ handle: handle } };
+}
+
+# upload a surface to a new texture. the surface stays alive and is still
+# owned by the caller
+# ---
+# rend: renderer that will own the texture
+# surf: surface to copy the pixels from
+# ret:  the new Texture, or error.Error.invalid for a nil renderer or surface,
+#       or error.Error.failed (text from error.message())
+pub fun from_surface(rend: renderer.Renderer, surf: surface.Surface) res[Texture, error.Error] {
+    if (!renderer.is_valid(rend)) {
+        ret res[Texture, error.Error].err{ error.Error.invalid{} };
+    }
+    if (!surface.is_valid(surf)) {
+        ret res[Texture, error.Error].err{ error.Error.invalid{} };
+    }
+    val handle: ptr = c.SDL_CreateTextureFromSurface(rend.handle, surf.handle);
+    if (handle == nil) {
+        ret res[Texture, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Texture, error.Error].ok{ Texture{ handle: handle } };
+}
+
+# load a BMP image file into a texture
+#
+# only BMP is supported: SDL3's core reads nothing else. other formats need
+# SDL_image, which is not bound here. SDL reads the file; the intermediate
+# surface is released before returning.
+# ---
+# rend: renderer that will own the texture
+# path: path to a .bmp file
+# ret:  the new Texture, or error.Error.invalid for a nil renderer, or
+#       error.Error.failed (text from error.message())
+pub fun load(rend: renderer.Renderer, path: str) res[Texture, error.Error] {
+    if (!renderer.is_valid(rend)) {
+        ret res[Texture, error.Error].err{ error.Error.invalid{} };
+    }
+    val loaded: res[surface.Surface, error.Error] = surface.load_bmp(path);
+    if (sel loaded.err) {
+        ret res[Texture, error.Error].err{ loaded.err };
+    }
+    val result: res[Texture, error.Error] = from_surface(rend, loaded.ok);
+    surface.destroy(loaded.ok);
+    ret result;
+}
+
+# destroy a texture. safe on an invalid handle
+# ---
+# tex: texture to destroy
+pub fun destroy(tex: Texture) {
+    if (is_valid(tex)) {
+        c.SDL_DestroyTexture(tex.handle);
+    }
+}
+
+# the texture size in pixels
+# ---
+# tex: texture to query
+# ret: the size, or an error.Error on failure
+pub fun size(tex: Texture) res[Size, error.Error] {
+    val r: err[error.Error] = ready(tex);
+    if (sel r.err) { ret res[Size, error.Error].err{ r.err }; }
+    var w: f32 = 0.0;
+    var h: f32 = 0.0;
+    if (c.SDL_GetTextureSize(tex.handle, ?w, ?h) == 0) {
+        ret res[Size, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Size, error.Error].ok{ Size{ w: w, h: h } };
+}
+
+# set how the texture combines with the target when drawn
+# ---
+# tex:  texture to change
+# mode: the blend mode
+pub fun set_blend(tex: Texture, mode: renderer.Blend) err[error.Error] {
+    val r: err[error.Error] = ready(tex);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetTextureBlendMode(tex.handle, renderer.blend_to_raw(mode)));
+}
+
+# the texture blend mode
+# ---
+# tex: texture to query
+# ret: the blend mode, or error.Error.unsupported for a custom SDL blend mode
+pub fun blend(tex: Texture) res[renderer.Blend, error.Error] {
+    val r: err[error.Error] = ready(tex);
+    if (sel r.err) { ret res[renderer.Blend, error.Error].err{ r.err }; }
+    var raw: u32 = 0;
+    if (c.SDL_GetTextureBlendMode(tex.handle, ?raw) == 0) {
+        ret res[renderer.Blend, error.Error].err{ error.Error.failed{} };
+    }
+    ret renderer.blend_from_raw(raw);
+}
+
+# multiply the texture's colors by a color when drawn. alpha is ignored,
+# use set_alpha_mod for that
+# ---
+# tex: texture to change
+# col: the color modulation
+pub fun set_color_mod(tex: Texture, col: Color) err[error.Error] {
+    val r: err[error.Error] = ready(tex);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetTextureColorMod(tex.handle, col.r, col.g, col.b));
+}
+
+# the texture color modulation
+# ---
+# tex: texture to query
+# ret: the color with alpha 255, or an error.Error on failure
+pub fun color_mod(tex: Texture) res[Color, error.Error] {
+    val r: err[error.Error] = ready(tex);
+    if (sel r.err) { ret res[Color, error.Error].err{ r.err }; }
+    var cr: u8 = 0;
+    var cg: u8 = 0;
+    var cb: u8 = 0;
+    if (c.SDL_GetTextureColorMod(tex.handle, ?cr, ?cg, ?cb) == 0) {
+        ret res[Color, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Color, error.Error].ok{ Color{ r: cr, g: cg, b: cb, a: 255 } };
+}
+
+# multiply the texture's alpha by a value when drawn
+# ---
+# tex: texture to change
+# a:   alpha modulation, 255 is unchanged
+pub fun set_alpha_mod(tex: Texture, a: u8) err[error.Error] {
+    val r: err[error.Error] = ready(tex);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetTextureAlphaMod(tex.handle, a));
+}
+
+# the texture alpha modulation
+# ---
+# tex: texture to query
+# ret: the alpha modulation, or an error.Error on failure
+pub fun alpha_mod(tex: Texture) res[u8, error.Error] {
+    val r: err[error.Error] = ready(tex);
+    if (sel r.err) { ret res[u8, error.Error].err{ r.err }; }
+    var a: u8 = 0;
+    if (c.SDL_GetTextureAlphaMod(tex.handle, ?a) == 0) {
+        ret res[u8, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[u8, error.Error].ok{ a };
+}
+
+# set how the texture is sampled when drawn at a different size
+# ---
+# tex:  texture to change
+# mode: the scale mode
+pub fun set_scale_mode(tex: Texture, mode: ScaleMode) err[error.Error] {
+    val r: err[error.Error] = ready(tex);
+    if (!sel r.ok) { ret r; }
+    var raw: u32 = c.SCALEMODE_NEAREST;
+    if (sel mode.linear) { raw = c.SCALEMODE_LINEAR; }
+    ret to_err(c.SDL_SetTextureScaleMode(tex.handle, raw));
+}
+
+# the texture scale mode
+# ---
+# tex: texture to query
+# ret: the scale mode, or an error.Error on failure
+pub fun scale_mode(tex: Texture) res[ScaleMode, error.Error] {
+    val r: err[error.Error] = ready(tex);
+    if (sel r.err) { ret res[ScaleMode, error.Error].err{ r.err }; }
+    var raw: u32 = 0;
+    if (c.SDL_GetTextureScaleMode(tex.handle, ?raw) == 0) {
+        ret res[ScaleMode, error.Error].err{ error.Error.failed{} };
+    }
+    if (raw == c.SCALEMODE_LINEAR) {
+        ret res[ScaleMode, error.Error].ok{ ScaleMode.linear{} };
+    }
+    ret res[ScaleMode, error.Error].ok{ ScaleMode.nearest{} };
+}

@@ -1,462 +1,373 @@
-# 2D rendering via SDL's own renderer
+# 2D rendering (sdl.renderer)
 #
-# an alternative to sdl.gl for simple 2D drawing -- clear/fill-rect/
-# present, no GL proc loading, no immediate-mode/core-profile questions.
-# use this OR gl.mach for a given window, not both: SDL_CreateRenderer
+# a Renderer is a by-value handle around SDL_Renderer. every fallible
+# function checks its handles first and returns error.Error.invalid for a nil
+# one, so SDL is never called with an invalid handle.
+#
+# use a Renderer or sdl.gl for a given window, not both: SDL_CreateRenderer
 # and SDL_GL_CreateContext both claim the window's drawable surface.
-#
-# unlike GL, this genuinely works under the headless dummy video driver
-# (SDL picks a software backend), so unlike gl.mach's functions, the
-# round-trip here gets a real functional test, not just a demo.
 
 use sdl.c;
-use sdl.core;
-use sdl.window.Window;
+use sdl.color.Color;
+use sdl.error;
+use sdl.rect.FPoint;
+use sdl.rect.FRect;
+use sdl.rect.Rect;
+use sdl.window;
 use std.types.bool.bool;
-use std.types.bool.true;
-use std.types.bool.false;
-use std.types.string.str;
+use std.types.error.err;
+use std.types.result.res;
+use std.types.size.usize;
 
-# create a renderer for a window
+# handle to an SDL renderer. the zero value (nil handle) is invalid
 # ---
-# window: window to attach the renderer to
-# ret:    the renderer handle, or nil on failure -- check core.get_error()
-pub fun create_renderer(window: Window) ptr {
-    ret c.SDL_CreateRenderer(window.handle, nil);
+# handle: opaque SDL_Renderer pointer, nil when invalid
+pub rec Renderer {
+    handle: ptr;
 }
 
-# destroy a renderer
-pub fun destroy_renderer(renderer: ptr) {
-    c.SDL_DestroyRenderer(renderer);
-}
-
-# set the color used by clear/fill/line/point calls until changed again
-pub fun set_draw_color(renderer: ptr, r: u8, g: u8, b: u8, a: u8) bool {
-    ret c.SDL_SetRenderDrawColor(renderer, r, g, b, a) != 0;
-}
-
-# clear the current render target to the current draw color
-pub fun clear(renderer: ptr) bool {
-    ret c.SDL_RenderClear(renderer) != 0;
-}
-
-# fill a rectangle with the current draw color
-pub fun fill_rect(renderer: ptr, rect: c.FRect) bool {
-    ret c.SDL_RenderFillRect(renderer, ?rect) != 0;
-}
-
-# outline a rectangle with the current draw color
-pub fun draw_rect(renderer: ptr, rect: c.FRect) bool {
-    ret c.SDL_RenderRect(renderer, ?rect) != 0;
-}
-
-# draw a line with the current draw color
-pub fun draw_line(renderer: ptr, x1: f32, y1: f32, x2: f32, y2: f32) bool {
-    ret c.SDL_RenderLine(renderer, x1, y1, x2, y2) != 0;
-}
-
-# present everything drawn since the last clear
-pub fun present(renderer: ptr) bool {
-    ret c.SDL_RenderPresent(renderer) != 0;
-}
-
-# load an image file straight into a texture for this renderer -- combines
-# SDL_LoadBMP + SDL_CreateTextureFromSurface + SDL_DestroySurface into one
-# call, since the intermediate surface has no use once the texture exists.
+# handle to an SDL texture. the zero value (nil handle) is invalid
 #
-# only BMP is supported (SDL_LoadBMP is all that's bound here) -- other
-# formats need SDL_image, a separate library not bound in this project.
+# defined here, not in sdl.texture, because mach refuses circular module
+# dependencies and drawing needs the type while sdl.texture needs Renderer.
+# sdl.texture re-exports it, so it is spelled texture.Texture everywhere.
 # ---
-# renderer: renderer to create the texture for
-# path:     path to a .bmp file
-# ret:      the texture handle, or nil on failure -- check core.get_error()
-pub fun load_texture(renderer: ptr, path: str) ptr {
-    val surface: ptr = c.SDL_LoadBMP(path);
-    if (surface == nil) { ret nil; }
-
-    val texture: ptr = c.SDL_CreateTextureFromSurface(renderer, surface);
-    c.SDL_DestroySurface(surface);
-    ret texture;
+# handle: opaque SDL_Texture pointer, nil when invalid
+pub rec Texture {
+    handle: ptr;
 }
 
-# destroy a texture
-pub fun destroy_texture(texture: ptr) {
-    c.SDL_DestroyTexture(texture);
-}
-
-# plain width/height pair, in pixels, as floats (textures report float
-# dimensions even though they're pixel-aligned in practice)
-pub rec FSize {
-    w: f32;
-    h: f32;
-}
-
-# color triple returned by get_texture_color_mod
-pub rec ColorRGB {
-    r: u8;
-    g: u8;
-    b: u8;
-}
-
-# a texture's width/height in pixels
+# how drawing combines with what is already on the target
 # ---
-# texture: texture to query
-# ret:     (w, h) -- (0.0, 0.0) if the query fails
-pub fun texture_size(texture: ptr) FSize {
-    var w: f32 = 0.0;
-    var h: f32 = 0.0;
-    c.SDL_GetTextureSize(texture, ?w, ?h);
-    ret FSize{ w: w, h: h };
+# none:                opaque overwrite
+# blend:               alpha blending
+# blend_premultiplied: alpha blending, source colors already multiplied by alpha
+# add:                 additive blending
+# add_premultiplied:   additive blending, source colors already multiplied by alpha
+# mod:                 color modulate
+# mul:                 color multiply
+pub tag Blend: u8 {
+    none;
+    blend;
+    blend_premultiplied;
+    add;
+    add_premultiplied;
+    mod;
+    mul;
 }
 
-# draw a texture, scaled to fill dst_rect
+# which way a texture is mirrored when drawn
+pub tag Flip: u8 {
+    none;
+    horizontal;
+    vertical;
+}
+
+# turn an SDL bool result into err[error.Error]
 # ---
-# renderer: renderer to draw with
-# texture:  texture to draw
-# dst_rect: destination rectangle in the renderer's coordinate space --
-#           the whole texture is stretched/shrunk to fit it
-pub fun draw_texture(renderer: ptr, texture: ptr, dst_rect: c.FRect) bool {
-    ret c.SDL_RenderTexture(renderer, texture, nil, ?dst_rect) != 0;
+# succeeded: the u8 result of an SDL call, nonzero on success
+fun to_err(succeeded: u8) err[error.Error] {
+    if (succeeded == 0) {
+        ret err[error.Error].err{ error.Error.failed{} };
+    }
+    ret err[error.Error].ok{};
 }
 
-# --- blend mode ---
-
-pub val BLEND_NONE:                u32 = c.BLENDMODE_NONE;
-pub val BLEND_BLEND:               u32 = c.BLENDMODE_BLEND;
-pub val BLEND_BLEND_PREMULTIPLIED: u32 = c.BLENDMODE_BLEND_PREMULTIPLIED;
-pub val BLEND_ADD:                 u32 = c.BLENDMODE_ADD;
-pub val BLEND_ADD_PREMULTIPLIED:   u32 = c.BLENDMODE_ADD_PREMULTIPLIED;
-pub val BLEND_MOD:                 u32 = c.BLENDMODE_MOD;
-pub val BLEND_MUL:                 u32 = c.BLENDMODE_MUL;
-
-# set how subsequent draw calls (fill/rect/line/point/texture) combine
-# with what's already on the render target -- BLEND_NONE (opaque
-# overwrite) until changed
-pub fun set_blend_mode(renderer: ptr, blend_mode: u32) bool {
-    ret c.SDL_SetRenderDrawBlendMode(renderer, blend_mode) != 0;
-}
-
-# --- render target ---
-#
-# KNOWN GAP: see c.mach's SDL_SetRenderTarget comment -- textures from
-# load_texture() are not guaranteed valid render targets, since this
-# binding has no lower-level SDL_CreateTexture call that requests
-# render-target access. safe today only for restoring the default
-# target (pass nil).
+# whether a Renderer holds a live handle
 # ---
-# renderer: renderer to redirect
-# texture:  texture to render into, or nil to restore the window itself
-pub fun set_render_target(renderer: ptr, texture: ptr) bool {
-    ret c.SDL_SetRenderTarget(renderer, texture) != 0;
+# rend: renderer to test
+# ret:  true if the handle is non-nil
+pub fun is_valid(rend: Renderer) bool {
+    ret rend.handle != nil;
 }
 
-# --- clip rect ---
-#
-# note the *integer* c.Rect here, not c.FRect like every other rect in
-# this module -- SDL's clip-rect calls are integer-only.
-
-# restrict drawing to a sub-region of the render target
-pub fun set_clip_rect(renderer: ptr, rect: c.Rect) bool {
-    ret c.SDL_SetRenderClipRect(renderer, ?rect) != 0;
-}
-
-# remove any clip restriction, drawing to the full target again
-pub fun clear_clip_rect(renderer: ptr) bool {
-    ret c.SDL_SetRenderClipRect(renderer, nil) != 0;
-}
-
-# the renderer's current clip rect
+# reject a nil renderer before SDL is called
 # ---
-# ret: the active clip rect; all-zero if there is none set
-pub fun get_clip_rect(renderer: ptr) c.Rect {
-    var r: c.Rect = c.Rect{ x: 0, y: 0, w: 0, h: 0 };
-    c.SDL_GetRenderClipRect(renderer, ?r);
-    ret r;
-}
-
-# --- render scale ---
-#
-# scales every subsequent drawing coordinate (fill/rect/line/point/
-# texture calls) -- does not affect the window's own pixel size, just
-# how renderer-space coordinates map onto it.
-
-pub rec Scale {
-    x: f32;
-    y: f32;
-}
-
-pub fun set_render_scale(renderer: ptr, x: f32, y: f32) bool {
-    ret c.SDL_SetRenderScale(renderer, x, y) != 0;
-}
-
-pub fun get_render_scale(renderer: ptr) Scale {
-    var x: f32 = 0.0;
-    var y: f32 = 0.0;
-    c.SDL_GetRenderScale(renderer, ?x, ?y);
-    ret Scale{ x: x, y: y };
-}
-
-# --- bulk draws ---
-#
-# all three take a pointer to the first element of a c.FPoint (or
-# c.FRect) array plus a count -- same "pointer to first element, cast to
-# ptr" convention as sdl.audio.put_data's buf param: build the pointer
-# with `(?arr[0])::ptr`.
-
-# draw a batch of individual points with the current draw color
-pub fun render_points(renderer: ptr, points: ptr, count: i32) bool {
-    ret c.SDL_RenderPoints(renderer, points, count) != 0;
-}
-
-# draw connected line segments through a batch of points ("connect the
-# dots") with the current draw color
-pub fun render_lines(renderer: ptr, points: ptr, count: i32) bool {
-    ret c.SDL_RenderLines(renderer, points, count) != 0;
-}
-
-# fill a batch of rectangles with the current draw color
-pub fun fill_rects(renderer: ptr, rects: ptr, count: i32) bool {
-    ret c.SDL_RenderFillRects(renderer, rects, count) != 0;
-}
-
-# --- texture properties ---
-#
-# per-texture blend mode, color/alpha modulation, and scale mode --
-# independent of the renderer-level draw blend mode.
-
-pub fun set_texture_blend_mode(texture: ptr, blend_mode: u32) bool {
-    ret c.SDL_SetTextureBlendMode(texture, blend_mode) != 0;
-}
-
-pub fun get_texture_blend_mode(texture: ptr) u32 {
-    var mode: u32 = 0;
-    c.SDL_GetTextureBlendMode(texture, ?mode);
-    ret mode;
-}
-
-pub fun set_texture_color_mod(texture: ptr, r: u8, g: u8, b: u8) bool {
-    ret c.SDL_SetTextureColorMod(texture, r, g, b) != 0;
-}
-
-pub fun get_texture_color_mod(texture: ptr) ColorRGB {
-    var r: u8 = 0;
-    var g: u8 = 0;
-    var b: u8 = 0;
-    c.SDL_GetTextureColorMod(texture, ?r, ?g, ?b);
-    ret ColorRGB{ r: r, g: g, b: b };
-}
-
-pub fun set_texture_alpha_mod(texture: ptr, alpha: u8) bool {
-    ret c.SDL_SetTextureAlphaMod(texture, alpha) != 0;
-}
-
-pub fun get_texture_alpha_mod(texture: ptr) u8 {
-    var alpha: u8 = 0;
-    c.SDL_GetTextureAlphaMod(texture, ?alpha);
-    ret alpha;
-}
-
-# scale mode: SCALEMODE_NEAREST (pixel art) or SCALEMODE_LINEAR (smooth)
-pub val SCALEMODE_NEAREST: u32 = c.SCALEMODE_NEAREST;
-pub val SCALEMODE_LINEAR:  u32 = c.SCALEMODE_LINEAR;
-
-pub fun set_texture_scale_mode(texture: ptr, scale_mode: u32) bool {
-    ret c.SDL_SetTextureScaleMode(texture, scale_mode) != 0;
-}
-
-pub fun get_texture_scale_mode(texture: ptr) u32 {
-    var mode: u32 = 0;
-    c.SDL_GetTextureScaleMode(texture, ?mode);
-    ret mode;
-}
-
-# --- rotated/flipped texture draw ---
-#
-# flip flags: FLIP_NONE, FLIP_HORIZONTAL, FLIP_VERTICAL
-
-pub val FLIP_NONE:       u32 = c.FLIP_NONE;
-pub val FLIP_HORIZONTAL: u32 = c.FLIP_HORIZONTAL;
-pub val FLIP_VERTICAL:   u32 = c.FLIP_VERTICAL;
-
-pub fun draw_texture_rotated(renderer: ptr, texture: ptr, dst_rect: c.FRect, angle: f64, center: c.FPoint, flip: u32) bool {
-    ret c.SDL_RenderTextureRotated(renderer, texture, nil, ?dst_rect, angle, ?center, flip) != 0;
-}
-
-test renderer_create_clear_present_destroy_round_trip_under_the_dummy_driver {
-    if (!core.use_dummy_video_driver()) { ret 1; }
-    if (!core.init(core.INIT_VIDEO)) { ret 1; }
-
-    val win: ptr = c.SDL_CreateWindow("renderer test", 64, 64, 0);
-    if (win == nil) {
-        core.quit();
-        ret 1;
+# rend: renderer the caller is about to use
+fun ready(rend: Renderer) err[error.Error] {
+    if (!is_valid(rend)) {
+        ret err[error.Error].err{ error.Error.invalid{} };
     }
-    val win_rec: Window = Window{ handle: win };
-
-    val r: ptr = create_renderer(win_rec);
-    if (r == nil) {
-        c.SDL_DestroyWindow(win);
-        core.quit();
-        ret 1;
-    }
-
-    var ok: bool = set_draw_color(r, 0, 0, 0, 255);
-    ok = ok && clear(r);
-
-    val rect: c.FRect = c.FRect{ x: 0.0, y: 0.0, w: 10.0, h: 10.0 };
-    ok = ok && fill_rect(r, rect);
-    ok = ok && present(r);
-
-    destroy_renderer(r);
-    c.SDL_DestroyWindow(win);
-    core.quit();
-
-    if (!ok) { ret 1; }
-    ret 0;
+    ret err[error.Error].ok{};
 }
 
-test renderer_blend_mode_clip_rect_scale_and_bulk_draws_round_trip_under_the_dummy_driver {
-    if (!core.use_dummy_video_driver()) { ret 1; }
-    if (!core.init(core.INIT_VIDEO)) { ret 1; }
-
-    val win: ptr = c.SDL_CreateWindow("renderer extras test", 64, 64, 0);
-    if (win == nil) {
-        core.quit();
-        ret 1;
+# reject a nil renderer or a nil texture before SDL is called
+# ---
+# rend: renderer the caller is about to use
+# tex:  texture the caller is about to use
+fun ready_with(rend: Renderer, tex: Texture) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    if (tex.handle == nil) {
+        ret err[error.Error].err{ error.Error.invalid{} };
     }
-    val win_rec: Window = Window{ handle: win };
-
-    val r: ptr = create_renderer(win_rec);
-    if (r == nil) {
-        c.SDL_DestroyWindow(win);
-        core.quit();
-        ret 1;
-    }
-
-    var ok: bool = set_blend_mode(r, BLEND_BLEND);
-
-    val clip: c.Rect = c.Rect{ x: 0, y: 0, w: 32, h: 32 };
-    ok = ok && set_clip_rect(r, clip);
-    ok = ok && clear_clip_rect(r);
-    val _unused_clip: c.Rect = get_clip_rect(r);
-
-    ok = ok && set_render_scale(r, 1.0, 1.0);
-    val scale: Scale = get_render_scale(r);
-    if (scale.x != 1.0 || scale.y != 1.0) { ok = 0; }
-
-    var pts: [3]c.FPoint;
-    pts[0] = c.FPoint{ x: 1.0, y: 1.0 };
-    pts[1] = c.FPoint{ x: 2.0, y: 2.0 };
-    pts[2] = c.FPoint{ x: 3.0, y: 3.0 };
-    ok = ok && render_points(r, (?pts[0])::ptr, 3);
-    ok = ok && render_lines(r, (?pts[0])::ptr, 3);
-
-    var rects: [2]c.FRect;
-    rects[0] = c.FRect{ x: 0.0, y: 0.0, w: 4.0, h: 4.0 };
-    rects[1] = c.FRect{ x: 8.0, y: 8.0, w: 4.0, h: 4.0 };
-    ok = ok && fill_rects(r, (?rects[0])::ptr, 2);
-
-    ok = ok && set_render_target(r, nil);
-
-    destroy_renderer(r);
-    c.SDL_DestroyWindow(win);
-    core.quit();
-
-    if (!ok) { ret 1; }
-    ret 0;
+    ret err[error.Error].ok{};
 }
 
-test renderer_load_texture_on_a_nonexistent_file_fails_cleanly_no_crash {
-    if (!core.use_dummy_video_driver()) { ret 1; }
-    if (!core.init(core.INIT_VIDEO)) { ret 1; }
-
-    val win: ptr = c.SDL_CreateWindow("texture test", 64, 64, 0);
-    if (win == nil) {
-        core.quit();
-        ret 1;
-    }
-    val win_rec: Window = Window{ handle: win };
-
-    val r: ptr = create_renderer(win_rec);
-    if (r == nil) {
-        c.SDL_DestroyWindow(win);
-        core.quit();
-        ret 1;
-    }
-
-    val tex: ptr = load_texture(r, "this-file-does-not-exist.bmp");
-
-    destroy_renderer(r);
-    c.SDL_DestroyWindow(win);
-    core.quit();
-
-    if (tex != nil) { ret 1; }  # should have failed, not succeeded
-    ret 0;
+# the SDL_BlendMode value of a Blend. shared with sdl.texture; not meant for
+# use outside this binding
+# ---
+# mode: blend mode to convert
+pub fun blend_to_raw(mode: Blend) u32 {
+    if (sel mode.blend)               { ret c.BLENDMODE_BLEND; }
+    if (sel mode.blend_premultiplied) { ret c.BLENDMODE_BLEND_PREMULTIPLIED; }
+    if (sel mode.add)                 { ret c.BLENDMODE_ADD; }
+    if (sel mode.add_premultiplied)   { ret c.BLENDMODE_ADD_PREMULTIPLIED; }
+    if (sel mode.mod)                 { ret c.BLENDMODE_MOD; }
+    if (sel mode.mul)                 { ret c.BLENDMODE_MUL; }
+    ret c.BLENDMODE_NONE;
 }
 
-test renderer_texture_blend_mode_color_alpha_mod_and_scale_mode_round_trip {
-    if (!core.use_dummy_video_driver()) { ret 1; }
-    if (!core.init(core.INIT_VIDEO)) { ret 1; }
+# the Blend of an SDL_BlendMode value. shared with sdl.texture; not meant for
+# use outside this binding
+# ---
+# raw: SDL blend mode value
+# ret: the Blend, or error.Error.unsupported for a custom SDL blend mode
+pub fun blend_from_raw(raw: u32) res[Blend, error.Error] {
+    if (raw == c.BLENDMODE_NONE)                { ret res[Blend, error.Error].ok{ Blend.none{} }; }
+    if (raw == c.BLENDMODE_BLEND)               { ret res[Blend, error.Error].ok{ Blend.blend{} }; }
+    if (raw == c.BLENDMODE_BLEND_PREMULTIPLIED) { ret res[Blend, error.Error].ok{ Blend.blend_premultiplied{} }; }
+    if (raw == c.BLENDMODE_ADD)                 { ret res[Blend, error.Error].ok{ Blend.add{} }; }
+    if (raw == c.BLENDMODE_ADD_PREMULTIPLIED)   { ret res[Blend, error.Error].ok{ Blend.add_premultiplied{} }; }
+    if (raw == c.BLENDMODE_MOD)                 { ret res[Blend, error.Error].ok{ Blend.mod{} }; }
+    if (raw == c.BLENDMODE_MUL)                 { ret res[Blend, error.Error].ok{ Blend.mul{} }; }
+    ret res[Blend, error.Error].err{ error.Error.unsupported{} };
+}
 
-    val win: ptr = c.SDL_CreateWindow("texture props test", 64, 64, 0);
-    if (win == nil) {
-        core.quit();
-        ret 1;
+# the SDL_FlipMode value of a Flip
+# ---
+# flip: flip to convert
+fun flip_to_raw(flip: Flip) u32 {
+    if (sel flip.horizontal) { ret c.FLIP_HORIZONTAL; }
+    if (sel flip.vertical)   { ret c.FLIP_VERTICAL; }
+    ret c.FLIP_NONE;
+}
+
+# create a renderer for a window. SDL picks the backend
+# ---
+# win: window to attach the renderer to
+# ret: the new Renderer, or error.Error.invalid for a nil window, or
+#      error.Error.failed (text from error.message())
+pub fun create(win: window.Window) res[Renderer, error.Error] {
+    if (!window.is_valid(win)) {
+        ret res[Renderer, error.Error].err{ error.Error.invalid{} };
     }
-    val win_rec: Window = Window{ handle: win };
-
-    val r: ptr = create_renderer(win_rec);
-    if (r == nil) {
-        c.SDL_DestroyWindow(win);
-        core.quit();
-        ret 1;
+    val handle: ptr = c.SDL_CreateRenderer(win.handle, nil);
+    if (handle == nil) {
+        ret res[Renderer, error.Error].err{ error.Error.failed{} };
     }
+    ret res[Renderer, error.Error].ok{ Renderer{ handle: handle } };
+}
 
-    # create a texture to exercise property getters/setters
-    val tex: ptr = c.SDL_CreateTexture(r, c.PIXELFORMAT_RGBA8888, c.TEXTUREACCESS_STATIC, 8, 8);
-    if (tex == nil) {
-        destroy_renderer(r);
-        c.SDL_DestroyWindow(win);
-        core.quit();
-        ret 1;
+# destroy a renderer and the textures made with it. safe on an invalid handle
+# ---
+# rend: renderer to destroy
+pub fun destroy(rend: Renderer) {
+    if (is_valid(rend)) {
+        c.SDL_DestroyRenderer(rend.handle);
     }
+}
 
-    var ok: bool = true;
+# set the color used by clear and the draw calls until changed again
+# ---
+# rend: renderer to change
+# col:  the new draw color
+pub fun set_color(rend: Renderer, col: Color) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetRenderDrawColor(rend.handle, col.r, col.g, col.b, col.a));
+}
 
-    # blend mode
-    ok = ok && set_texture_blend_mode(tex, BLEND_BLEND);
-    val blend: u32 = get_texture_blend_mode(tex);
-    if (blend != BLEND_BLEND) { ok = false; }
+# clear the current target to the draw color
+# ---
+# rend: renderer to clear
+pub fun clear(rend: Renderer) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RenderClear(rend.handle));
+}
 
-    # color mod
-    ok = ok && set_texture_color_mod(tex, 100, 150, 200);
-    val rgb: ColorRGB = get_texture_color_mod(tex);
-    if (rgb.r != 100 || rgb.g != 150 || rgb.b != 200) { ok = false; }
+# show everything drawn since the last present
+# ---
+# rend: renderer to present
+pub fun present(rend: Renderer) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RenderPresent(rend.handle));
+}
 
-    # alpha mod
-    ok = ok && set_texture_alpha_mod(tex, 128);
-    val alpha: u8 = get_texture_alpha_mod(tex);
-    if (alpha != 128) { ok = false; }
+# fill a rectangle with the draw color
+# ---
+# rend: renderer to draw with
+# rc:   rectangle to fill
+pub fun fill_rect(rend: Renderer, rc: FRect) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RenderFillRect(rend.handle, (?rc)::*c.FRect));
+}
 
-    # scale mode
-    ok = ok && set_texture_scale_mode(tex, SCALEMODE_NEAREST);
-    val sm: u32 = get_texture_scale_mode(tex);
-    if (sm != SCALEMODE_NEAREST) { ok = false; }
+# outline a rectangle with the draw color
+# ---
+# rend: renderer to draw with
+# rc:   rectangle to outline
+pub fun draw_rect(rend: Renderer, rc: FRect) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RenderRect(rend.handle, (?rc)::*c.FRect));
+}
 
-    # draw rotated (no flip, 0 degrees)
-    val dst: c.FRect = c.FRect{ x: 0.0, y: 0.0, w: 8.0, h: 8.0 };
-    val ctr: c.FPoint = c.FPoint{ x: 4.0, y: 4.0 };
-    ok = ok && draw_texture_rotated(r, tex, dst, 0.0, ctr, FLIP_NONE);
-    ok = ok && present(r);
+# draw a line with the draw color
+# ---
+# rend: renderer to draw with
+# a:    start point
+# b:    end point
+pub fun draw_line(rend: Renderer, a: FPoint, b: FPoint) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RenderLine(rend.handle, a.x, a.y, b.x, b.y));
+}
 
-    # draw with horizontal flip
-    ok = ok && draw_texture_rotated(r, tex, dst, 0.0, ctr, FLIP_HORIZONTAL);
+# draw many points with the draw color
+# ---
+# rend:  renderer to draw with
+# pts:   first of count consecutive points
+# count: number of points
+pub fun draw_points(rend: Renderer, pts: *FPoint, count: usize) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RenderPoints(rend.handle, pts::ptr, count::i32));
+}
 
-    destroy_texture(tex);
-    destroy_renderer(r);
-    c.SDL_DestroyWindow(win);
-    core.quit();
+# draw connected line segments through many points with the draw color
+# ---
+# rend:  renderer to draw with
+# pts:   first of count consecutive points
+# count: number of points
+pub fun draw_lines(rend: Renderer, pts: *FPoint, count: usize) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RenderLines(rend.handle, pts::ptr, count::i32));
+}
 
-    if (!ok) { ret 1; }
-    ret 0;
+# fill many rectangles with the draw color
+# ---
+# rend:  renderer to draw with
+# rects: first of count consecutive rectangles
+# count: number of rectangles
+pub fun fill_rects(rend: Renderer, rects: *FRect, count: usize) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RenderFillRects(rend.handle, rects::ptr, count::i32));
+}
+
+# draw into a texture instead of the window. the texture must have been
+# created with render-target access
+# ---
+# rend: renderer to retarget
+# tex:  texture to draw into
+pub fun set_target(rend: Renderer, tex: Texture) err[error.Error] {
+    val r: err[error.Error] = ready_with(rend, tex);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetRenderTarget(rend.handle, tex.handle));
+}
+
+# draw into the window again
+# ---
+# rend: renderer to retarget
+pub fun reset_target(rend: Renderer) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetRenderTarget(rend.handle, nil));
+}
+
+# limit drawing to a rectangle of the target
+# ---
+# rend: renderer to change
+# rc:   clip rectangle in target pixels
+pub fun set_clip(rend: Renderer, rc: Rect) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetRenderClipRect(rend.handle, (?rc)::*c.Rect));
+}
+
+# remove the clip rectangle
+# ---
+# rend: renderer to change
+pub fun clear_clip(rend: Renderer) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetRenderClipRect(rend.handle, nil));
+}
+
+# the current clip rectangle
+# ---
+# rend: renderer to query
+# ret:  the clip rectangle. all zero when none is set or the handle is invalid
+pub fun clip(rend: Renderer) Rect {
+    var rc: Rect = Rect{ x: 0, y: 0, w: 0, h: 0 };
+    if (is_valid(rend)) {
+        c.SDL_GetRenderClipRect(rend.handle, (?rc)::*c.Rect);
+    }
+    ret rc;
+}
+
+# scale everything drawn from now on
+# ---
+# rend: renderer to change
+# x:    horizontal scale, 1.0 is unscaled
+# y:    vertical scale, 1.0 is unscaled
+pub fun set_scale(rend: Renderer, x: f32, y: f32) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetRenderScale(rend.handle, x, y));
+}
+
+# the current render scale
+# ---
+# rend: renderer to query
+# ret:  (x, y) scale. (1.0, 1.0) when the handle is invalid
+pub fun scale(rend: Renderer) FPoint {
+    var x: f32 = 1.0;
+    var y: f32 = 1.0;
+    if (is_valid(rend)) {
+        c.SDL_GetRenderScale(rend.handle, ?x, ?y);
+    }
+    ret FPoint{ x: x, y: y };
+}
+
+# set how drawing combines with what is already on the target
+# ---
+# rend: renderer to change
+# mode: the blend mode
+pub fun set_blend(rend: Renderer, mode: Blend) err[error.Error] {
+    val r: err[error.Error] = ready(rend);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetRenderDrawBlendMode(rend.handle, blend_to_raw(mode)));
+}
+
+# draw a whole texture, stretched to fill a rectangle
+# ---
+# rend: renderer to draw with
+# tex:  texture to draw
+# dst:  destination rectangle in target coordinates
+pub fun draw_texture(rend: Renderer, tex: Texture, dst: FRect) err[error.Error] {
+    val r: err[error.Error] = ready_with(rend, tex);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RenderTexture(rend.handle, tex.handle, nil, (?dst)::*c.FRect));
+}
+
+# draw a whole texture, rotated and optionally mirrored
+# ---
+# rend:   renderer to draw with
+# tex:    texture to draw
+# dst:    destination rectangle in target coordinates
+# angle:  clockwise rotation in degrees
+# center: rotation point, relative to the top-left of dst
+# flip:   mirroring, applied before the rotation
+pub fun draw_texture_rotated(rend: Renderer, tex: Texture, dst: FRect,
+                             angle: f64, center: FPoint, flip: Flip) err[error.Error] {
+    val r: err[error.Error] = ready_with(rend, tex);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RenderTextureRotated(rend.handle, tex.handle, nil, (?dst)::*c.FRect,
+                                          angle, (?center)::*c.FPoint, flip_to_raw(flip)));
 }

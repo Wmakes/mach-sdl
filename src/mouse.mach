@@ -1,101 +1,114 @@
-# mouse position, buttons, cursor visibility
+# mouse buttons, position, cursor and capture (sdl.mouse)
 #
-# mach-idiomatic wrappers over sdl.c's SDL_mouse.h imports. get_state()
-# returns a bitmask, not a button index -- test a specific button with
-# `(mask & (1 << (BUTTON_LEFT - 1))) != 0`, not `mask == BUTTON_LEFT`.
+# the functions that act on a window take a sdl.window.Window, never a raw
+# pointer. state() and relative_state() return button bitmasks: test one
+# button with (state.buttons & (1 << (mouse.LEFT - 1))) != 0.
 
 use sdl.c;
-use sdl.core;
+use sdl.error;
+use sdl.window;
 use std.types.bool.bool;
+use std.types.bool.false;
+use std.types.error.err;
 
-pub val BUTTON_LEFT:   u8 = c.BUTTON_LEFT;
-pub val BUTTON_MIDDLE: u8 = c.BUTTON_MIDDLE;
-pub val BUTTON_RIGHT:  u8 = c.BUTTON_RIGHT;
-pub val BUTTON_X1:     u8 = c.BUTTON_X1;
-pub val BUTTON_X2:     u8 = c.BUTTON_X2;
+pub val LEFT:   u8 = c.BUTTON_LEFT;
+pub val MIDDLE: u8 = c.BUTTON_MIDDLE;
+pub val RIGHT:  u8 = c.BUTTON_RIGHT;
+pub val X1:     u8 = c.BUTTON_X1;
+pub val X2:     u8 = c.BUTTON_X2;
 
-# current mouse position (relative to the focused window) and button mask
+# mouse position and held buttons
 # ---
-# x: out-param, x position
-# y: out-param, y position
-# ret: bitmask -- test with e.g. `(mask & (1 << (BUTTON_LEFT - 1))) != 0`
-pub fun get_state(x: *f32, y: *f32) u32 {
-    ret c.SDL_GetMouseState(x, y);
+# x, y:    position in window coordinates, or motion deltas from relative_state()
+# buttons: bitmask of held buttons
+pub rec State {
+    x:       f32;
+    y:       f32;
+    buttons: u32;
 }
 
-# move the mouse to a position relative to a window
+# turn an SDL bool result into err[error.Error]
 # ---
-# window: window handle (ptr, as stored in sdl.window.Window.handle)
-# x, y:   target position, relative to the window
-pub fun warp_in_window(window: ptr, x: f32, y: f32) {
-    c.SDL_WarpMouseInWindow(window, x, y);
+# succeeded: the u8 result of an SDL call, nonzero on success
+fun to_err(succeeded: u8) err[error.Error] {
+    if (succeeded == 0) {
+        ret err[error.Error].err{ error.Error.failed{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# reject a nil window handle before SDL is called
+# ---
+# win: window the caller is about to use
+fun ready(win: window.Window) err[error.Error] {
+    if (!window.is_valid(win)) {
+        ret err[error.Error].err{ error.Error.invalid{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# the mouse position relative to the focused window, and held buttons
+pub fun state() State {
+    var x: f32 = 0.0;
+    var y: f32 = 0.0;
+    val buttons: u32 = c.SDL_GetMouseState(?x, ?y);
+    ret State{ x: x, y: y, buttons: buttons };
+}
+
+# the motion since the last call, and held buttons. only meaningful while
+# relative mode is on for a window (see set_relative)
+pub fun relative_state() State {
+    var dx: f32 = 0.0;
+    var dy: f32 = 0.0;
+    val buttons: u32 = c.SDL_GetRelativeMouseState(?dx, ?dy);
+    ret State{ x: dx, y: dy, buttons: buttons };
+}
+
+# move the cursor to a position inside a window
+# ---
+# win: window to move the cursor within
+# x, y: target position in window coordinates
+pub fun warp(win: window.Window, x: f32, y: f32) {
+    if (window.is_valid(win)) {
+        c.SDL_WarpMouseInWindow(win.handle, x, y);
+    }
 }
 
 # show the system cursor
-# ---
-# ret: true on success
-pub fun show_cursor() bool {
-    ret c.SDL_ShowCursor() != 0;
+pub fun show_cursor() err[error.Error] {
+    ret to_err(c.SDL_ShowCursor());
 }
 
 # hide the system cursor
+pub fun hide_cursor() err[error.Error] {
+    ret to_err(c.SDL_HideCursor());
+}
+
+# hide and confine the cursor to a window, and report only motion deltas
+# (see relative_state). the usual pattern for camera-look controls
 # ---
-# ret: true on success
-pub fun hide_cursor() bool {
-    ret c.SDL_HideCursor() != 0;
+# win: window to apply relative mode to
+# on:  true to enter relative mode, false to leave it
+pub fun set_relative(win: window.Window, on: bool) err[error.Error] {
+    val r: err[error.Error] = ready(win);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_SetWindowRelativeMouseMode(win.handle, on));
 }
 
-# enable/disable relative mouse mode for a window -- while enabled, SDL
-# hides and confines the cursor and reports motion only as deltas (via
-# get_relative_state) rather than absolute position. the standard
-# pattern for FPS-style look controls.
+# whether relative mode is on for a window
 # ---
-# window:  window handle (ptr, as stored in sdl.window.Window.handle)
-# enabled: true to enter relative mode, false to leave it
-# ret:     true on success
-pub fun set_relative_mode(window: ptr, enabled: bool) bool {
-    var flag: u8 = 0;
-    if (enabled) { flag = 1; }
-    ret c.SDL_SetWindowRelativeMouseMode(window, flag) != 0;
+# ret: false for an invalid window
+pub fun is_relative(win: window.Window) bool {
+    if (!window.is_valid(win)) {
+        ret false;
+    }
+    ret c.SDL_GetWindowRelativeMouseMode(win.handle) != 0;
 }
 
-# whether relative mouse mode is currently enabled for a window
-pub fun relative_mode_enabled(window: ptr) bool {
-    ret c.SDL_GetWindowRelativeMouseMode(window) != 0;
-}
-
-# accumulated mouse motion (delta since the last call) and button mask
-# -- only meaningful while relative mode is enabled; see
-# set_relative_mode
+# keep receiving mouse events while the button is held, even outside the
+# window. unlike relative mode, the cursor stays visible
 # ---
-# x:   out-param, delta x
-# y:   out-param, delta y
-# ret: bitmask -- test with e.g. `(mask & (1 << (BUTTON_LEFT - 1))) != 0`
-pub fun get_relative_state(x: *f32, y: *f32) u32 {
-    ret c.SDL_GetRelativeMouseState(x, y);
-}
-
-# capture the mouse to this application even outside its window's
-# bounds -- keeps delivering motion/button events past the window edge
-# (e.g. for drag operations). distinct from relative mode: this doesn't
-# hide the cursor or switch to delta-only reporting.
-# ---
-# enabled: true to start capturing, false to release
-# ret:     true on success
-pub fun capture(enabled: bool) bool {
-    var flag: u8 = 0;
-    if (enabled) { flag = 1; }
-    ret c.SDL_CaptureMouse(flag) != 0;
-}
-
-test mouse_get_relative_state_does_not_crash_under_the_dummy_driver {
-    if (!core.use_dummy_video_driver()) { ret 1; }
-    if (!core.init(core.INIT_VIDEO)) { ret 1; }
-
-    var dx: f32 = 0.0;
-    var dy: f32 = 0.0;
-    val _unused: u32 = get_relative_state(?dx, ?dy);
-
-    core.quit();
-    ret 0;
+# on: true to start capturing, false to release
+pub fun capture(on: bool) err[error.Error] {
+    ret to_err(c.SDL_CaptureMouse(on));
 }

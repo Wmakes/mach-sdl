@@ -1,60 +1,67 @@
-# demo/smoke-test for mach-sdl v3
+# demo / smoke test for mach-sdl
 #
-# exercises every module in one run:
+# one run exercises every module of the bindings:
 #
-#   core      init (video+audio), quit, get_error
-#   window    open_gl_window, create_window, set_title, get_size,
-#             set_fullscreen
-#   gl        create_context, legacy immediate-mode drawing
-#   renderer  create_renderer, clear, fill_rect, draw_rect, draw_line,
-#             draw_texture (on a procedurally-created BMP at runtime
-#             since we can't ship a BMP here -- shows the failure path
-#             instead of skipping the code entirely)
-#   events    keyboard (WASD/F/ESC), mouse motion + click, window resize,
-#             wheel
-#   key       full scancode table used: WASD, F (fullscreen),
-#             SPACE (beep), ESC
-#   mouse     get_state (cursor pos poll each frame), hide/show cursor
-#             (toggle on M key)
-#   timer     Clock/tick driving delta-time movement
-#   audio     open_playback_stream, square-wave beep on SPACE
-#   rect      intersects/point_in_rect live per-frame (a collectible square
-#             that respawns when you touch it, proving collision works)
-#   rand      seed from ticks_ns, rand_range to place the collectible
-#   msgbox    info dialog on ESC before quitting (confirms the dialog
-#             blocks correctly -- you have to click OK before the loop ends)
-#   window    Size from get_size used for the orthographic projection so
-#             resizing the window actually adjusts the coordinate space
+#   core       init (video + audio), quit
+#   window     create (GL window and plain window), set_title, size,
+#              set_fullscreen, minimize / restore
+#   gl         create_context, proc_address, swap, legacy immediate-mode
+#              drawing in the main window
+#   renderer   create, set_color, clear, fill_rect, draw_rect, set_blend,
+#              set_clip, draw_points, draw_lines, fill_rects in the second
+#              window; texture.load on a missing file shows the failure path
+#   event      poll() into the typed Event tag: keys, mouse, wheel, resize
+#   key        scancode constants: WASD, F, M, L, N, C, V, SPACE, ESC
+#   mouse      state() each frame, show / hide cursor (M), relative mode (L)
+#   timer      Clock / tick drives delta-time movement
+#   audio      open + put + resume: a square-wave beep on SPACE
+#   rect       intersects: a collectible that respawns when you touch it
+#   rand       seeded from ticks_ns, range places the collectible
+#   clipboard  set_text / text / free_text round trip (C and V)
+#   msgbox     info dialog on exit (blocks until you click OK)
+#   error      message() for every failure report
 #
-#   phase 1 additions (renderer blend mode / clip rect / render scale /
-#   bulk draws, window minimize+restore, mouse relative mode, clipboard):
-#   renderer  translucent halo via set_blend_mode, a clipped corner
-#             starfield via set_clip_rect + render_points/render_lines,
-#             and a row of tick marks via fill_rects -- all in the
-#             renderer window
-#   window    minimize/restore toggle on the renderer window (N key)
-#   mouse     relative mode toggle on the main window (L key)
-#   clipboard set_text/get_text/free_text round-trip (C/V keys)
+# controls: WASD move, SPACE beep, M cursor, F fullscreen, L relative mouse,
+# N minimize / restore the renderer window, C copy, V paste, ESC quit.
 
 use std.runtime;
 use print: std.print;
 use std.types.bool.bool;
 use std.types.bool.true;
 use std.types.bool.false;
-use std.types.string.str;
+use std.types.error.err;
+use std.types.option.opt;
+use std.types.result.res;
 use std.types.size.usize;
-use sdl: sdl.sdl;
+use std.types.string.str;
 
-def GlClearColorFun:  fun(f32, f32, f32, f32);
-def GlClearFun:       fun(u32);
-def GlViewportFun:    fun(i32, i32, i32, i32);
-def GlMatrixModeFun:  fun(u32);
+use sdl.audio;
+use sdl.clipboard;
+use sdl.color.Color;
+use sdl.core;
+use sdl.error;
+use sdl.event;
+use sdl.gl;
+use sdl.key;
+use sdl.mouse;
+use sdl.msgbox;
+use sdl.rand;
+use sdl.rect;
+use sdl.renderer;
+use sdl.texture;
+use sdl.timer;
+use sdl.window;
+
+def GlClearColorFun:   fun(f32, f32, f32, f32);
+def GlClearFun:        fun(u32);
+def GlViewportFun:     fun(i32, i32, i32, i32);
+def GlMatrixModeFun:   fun(u32);
 def GlLoadIdentityFun: fun();
-def GlOrthoFun:       fun(f64, f64, f64, f64, f64, f64);
-def GlBeginFun:       fun(u32);
-def GlEndFun:         fun();
-def GlVertex2fFun:    fun(f32, f32);
-def GlColor3fFun:     fun(f32, f32, f32);
+def GlOrthoFun:        fun(f64, f64, f64, f64, f64, f64);
+def GlBeginFun:        fun(u32);
+def GlEndFun:          fun();
+def GlVertex2fFun:     fun(f32, f32);
+def GlColor3fFun:      fun(f32, f32, f32);
 
 val GL_COLOR_BUFFER_BIT: u32 = 0x00004000;
 val GL_PROJECTION:       u32 = 0x1701;
@@ -66,13 +73,26 @@ val BEEP_SAMPLES:        i64 = 1200;
 val BEEP_HALF_PERIOD:    i64 = 9;
 val BEEP_AMPLITUDE:      i16 = 3000;
 
+# print "<msg>: <SDL error text>" to stderr and give back the exit code 1
 fun fail(msg: str) i64 {
     print.eprint(msg);
     print.eprint(": ");
-    print.eprintln(sdl.get_error());
+    print.eprintln(error.message());
     ret 1;
 }
 
+# look up a GL function by name, nil when the driver does not have it
+fun load_gl(name: str) ptr {
+    val found: opt[ptr] = gl.proc_address(name);
+    if (!sel found.some) { ret nil; }
+    ret found.some;
+}
+
+fun color_of(r: u8, g: u8, b: u8, a: u8) Color {
+    ret Color{ r: r, g: g, b: b, a: a };
+}
+
+# a short s16 mono square wave
 fun fill_beep(buf: *u8) {
     var i: i64 = 0;
     for (i < BEEP_SAMPLES) {
@@ -98,55 +118,57 @@ fun draw_square(gl_begin: GlBeginFun, gl_end: GlEndFun,
     gl_end();
 }
 
-fun spawn_collectible(win_w: f32, win_h: f32) sdl.FRect {
-    val cx: f32 = sdl.rand_range(HALF + 5.0, win_w - HALF - 5.0);
-    val cy: f32 = sdl.rand_range(HALF + 5.0, win_h - HALF - 5.0);
-    ret sdl.FRect{ x: cx - HALF, y: cy - HALF, w: HALF * 2.0, h: HALF * 2.0 };
+fun spawn_collectible(win_w: f32, win_h: f32) rect.FRect {
+    val cx: f32 = rand.range(HALF + 5.0, win_w - HALF - 5.0);
+    val cy: f32 = rand.range(HALF + 5.0, win_h - HALF - 5.0);
+    ret rect.FRect{ x: cx - HALF, y: cy - HALF, w: HALF * 2.0, h: HALF * 2.0 };
 }
 
 #[symbol("main")]
 fun main(argc: i64, argv: **u8) i64 {
-    if (!sdl.init(sdl.INIT_VIDEO | sdl.INIT_AUDIO)) {
+    val started: err[error.Error] = core.init(core.VIDEO | core.AUDIO);
+    if (sel started.err) {
         ret fail("SDL_Init failed");
     }
 
-    # seed the RNG from the current time -- different run, different collectible positions
-    sdl.seed(sdl.ticks_ns());
+    # a different seed each run, so the collectible lands somewhere new
+    rand.seed(timer.ticks_ns());
 
-    # --- main window: GL ---
-    val w: sdl.Window = sdl.open_gl_window("mach-sdl demo", 800, 600);
-    if (!sdl.window_is_valid(w)) {
-        val r: i64 = fail("SDL_CreateWindow failed");
-        sdl.quit();
+    # --- main window: OpenGL ---
+    val made_main: res[window.Window, error.Error] = window.create("mach-sdl demo", 800, 600, window.OPENGL | window.RESIZABLE);
+    if (sel made_main.err) {
+        val r: i64 = fail("window.create failed");
+        core.quit();
         ret r;
     }
+    val main_win: window.Window = made_main.ok;
 
-    val ctx: ptr = sdl.create_context(w);
-    if (ctx == nil) {
+    val made_ctx: res[gl.GlContext, error.Error] = gl.create_context(main_win);
+    if (sel made_ctx.err) {
         val r: i64 = fail("GL context failed");
-        sdl.destroy_window(w);
-        sdl.quit();
+        window.destroy(main_win);
+        core.quit();
         ret r;
     }
+    val ctx: gl.GlContext = made_ctx.ok;
 
-    # load GL functions
-    val clear_color: GlClearColorFun   = sdl.get_proc_address("glClearColor"):~GlClearColorFun;
-    val clear_gl:    GlClearFun        = sdl.get_proc_address("glClear"):~GlClearFun;
-    val viewport:    GlViewportFun     = sdl.get_proc_address("glViewport"):~GlViewportFun;
-    val matrix_mode: GlMatrixModeFun   = sdl.get_proc_address("glMatrixMode"):~GlMatrixModeFun;
-    val load_id:     GlLoadIdentityFun = sdl.get_proc_address("glLoadIdentity"):~GlLoadIdentityFun;
-    val ortho:       GlOrthoFun        = sdl.get_proc_address("glOrtho"):~GlOrthoFun;
-    val gl_begin:    GlBeginFun        = sdl.get_proc_address("glBegin"):~GlBeginFun;
-    val gl_end:      GlEndFun          = sdl.get_proc_address("glEnd"):~GlEndFun;
-    val vertex2f:    GlVertex2fFun     = sdl.get_proc_address("glVertex2f"):~GlVertex2fFun;
-    val color3f:     GlColor3fFun      = sdl.get_proc_address("glColor3f"):~GlColor3fFun;
+    val clear_color: GlClearColorFun   = load_gl("glClearColor"):~GlClearColorFun;
+    val clear_gl:    GlClearFun        = load_gl("glClear"):~GlClearFun;
+    val viewport:    GlViewportFun     = load_gl("glViewport"):~GlViewportFun;
+    val matrix_mode: GlMatrixModeFun   = load_gl("glMatrixMode"):~GlMatrixModeFun;
+    val load_id:     GlLoadIdentityFun = load_gl("glLoadIdentity"):~GlLoadIdentityFun;
+    val ortho:       GlOrthoFun        = load_gl("glOrtho"):~GlOrthoFun;
+    val gl_begin:    GlBeginFun        = load_gl("glBegin"):~GlBeginFun;
+    val gl_end:      GlEndFun          = load_gl("glEnd"):~GlEndFun;
+    val vertex2f:    GlVertex2fFun     = load_gl("glVertex2f"):~GlVertex2fFun;
+    val color3f:     GlColor3fFun      = load_gl("glColor3f"):~GlColor3fFun;
     if (clear_color == nil || clear_gl == nil || viewport == nil || matrix_mode == nil
         || load_id == nil || ortho == nil || gl_begin == nil || gl_end == nil
         || vertex2f == nil || color3f == nil) {
         print.eprintln("failed to load GL functions");
-        sdl.destroy_context(ctx);
-        sdl.destroy_window(w);
-        sdl.quit();
+        gl.destroy_context(ctx);
+        window.destroy(main_win);
+        core.quit();
         ret 1;
     }
 
@@ -159,47 +181,55 @@ fun main(argc: i64, argv: **u8) i64 {
     matrix_mode(GL_MODELVIEW);
 
     # --- second window: SDL renderer ---
-    val w2: sdl.Window = sdl.create_window("renderer view", 300, 300, 0);
-    if (!sdl.window_is_valid(w2)) {
+    val made_second: res[window.Window, error.Error] = window.create("renderer view", 300, 300, 0);
+    if (sel made_second.err) {
         val r: i64 = fail("second window failed");
-        sdl.destroy_context(ctx);
-        sdl.destroy_window(w);
-        sdl.quit();
+        gl.destroy_context(ctx);
+        window.destroy(main_win);
+        core.quit();
         ret r;
     }
-    sdl.set_title(w2, "mach-sdl: renderer window");
+    val rend_win: window.Window = made_second.ok;
+    window.set_title(rend_win, "mach-sdl: renderer window");
 
-    val rend: ptr = sdl.create_renderer(w2);
-    if (rend == nil) {
-        val r: i64 = fail("SDL_CreateRenderer failed");
-        sdl.destroy_window(w2);
-        sdl.destroy_context(ctx);
-        sdl.destroy_window(w);
-        sdl.quit();
+    val made_rend: res[renderer.Renderer, error.Error] = renderer.create(rend_win);
+    if (sel made_rend.err) {
+        val r: i64 = fail("renderer.create failed");
+        window.destroy(rend_win);
+        gl.destroy_context(ctx);
+        window.destroy(main_win);
+        core.quit();
         ret r;
     }
+    val rend: renderer.Renderer = made_rend.ok;
 
-    # try loading a texture (will fail gracefully since there's no BMP on
-    # disk -- exercises the failure path and confirms it doesn't crash)
-    val test_tex: ptr = sdl.load_texture(rend, "nonexistent.bmp");
-    if (test_tex == nil) {
-        print.println("texture load (expected failure): ok -- no crash, error reported cleanly");
+    # there is no BMP on disk, so this must fail cleanly: it exercises the
+    # error path of texture.load without needing an asset
+    val test_tex: res[texture.Texture, error.Error] = texture.load(rend, "nonexistent.bmp");
+    if (sel test_tex.err) {
+        print.println("texture load (expected failure): ok, no crash, error reported cleanly");
+    }
+    if (sel test_tex.ok) {
+        texture.destroy(test_tex.ok);
     }
 
     # --- audio ---
-    val beep_stream: sdl.Stream = sdl.open_playback_stream(sdl.FORMAT_S16, 1, 8000);
-    val have_audio: bool = sdl.stream_is_valid(beep_stream);
-    if (have_audio) {
-        sdl.resume(beep_stream);
+    var beep_stream: audio.Stream;
+    var have_audio: bool = false;
+    val opened_audio: res[audio.Stream, error.Error] = audio.open(audio.Format.s16{}, 1, 8000);
+    if (sel opened_audio.ok) {
+        beep_stream = opened_audio.ok;
+        have_audio = true;
+        audio.resume(beep_stream);
         print.println("audio: stream open");
     } or {
-        print.println("audio device unavailable -- SPACE will be silent");
+        print.println("audio device unavailable, SPACE will be silent");
     }
     var beep: [2400]u8;
     fill_beep(?beep[0]);
 
     # --- collectible (rect + rand) ---
-    var collectible: sdl.FRect = spawn_collectible(win_w, win_h);
+    var collectible: rect.FRect = spawn_collectible(win_w, win_h);
     var score: i64 = 0;
 
     print.println("");
@@ -217,110 +247,121 @@ fun main(argc: i64, argv: **u8) i64 {
     var cursor_hidden: bool = false;
     var fullscreen:    bool = false;
     var relative_mode: bool = false;
-    var w2_minimized:  bool = false;
+    var rend_win_minimized: bool = false;
 
-    var clk: sdl.Clock = sdl.new_clock();
+    var clk: timer.Clock = timer.clock();
     var print_accum: f64 = 0.0;
     var running: u8 = 1;
-    var ev: sdl.Event;
 
     for (running != 0) {
-        for (sdl.poll_event(?ev)) {
-            val t: u32 = sdl.event_type(?ev);
+        for (true) {
+            val next: opt[event.Event] = event.poll();
+            if (!sel next.some) { brk; }
+            val ev: event.Event = next.some;
 
-            if (t == sdl.EVENT_QUIT) {
+            if (sel ev.quit) {
                 running = 0;
             }
-            or (t == sdl.EVENT_KEY_DOWN) {
-                val kb: sdl.KeyboardEvent = sdl.as_keyboard(?ev);
 
-                if (kb.scancode == sdl.ESCAPE) {
+            if (sel ev.key_down) {
+                val kd: event.KeyEvent = ev.key_down;
+                val fresh: bool = !kd.repeat;
+
+                if (kd.scancode == key.ESCAPE) {
                     running = 0;
                 }
-                or (kb.scancode == sdl.W) { move_up = 1; }
-                or (kb.scancode == sdl.S) { move_down = 1; }
-                or (kb.scancode == sdl.A) { move_left = 1; }
-                or (kb.scancode == sdl.D) { move_right = 1; }
-                or (kb.scancode == sdl.F && sdl.key_is_fresh_press(kb)) {
+                or (kd.scancode == key.W) { move_up = 1; }
+                or (kd.scancode == key.S) { move_down = 1; }
+                or (kd.scancode == key.A) { move_left = 1; }
+                or (kd.scancode == key.D) { move_right = 1; }
+                or (kd.scancode == key.F && fresh) {
                     fullscreen = !fullscreen;
-                    sdl.set_fullscreen(w, fullscreen);
+                    window.set_fullscreen(main_win, fullscreen);
                 }
-                or (kb.scancode == sdl.M && sdl.key_is_fresh_press(kb)) {
+                or (kd.scancode == key.M && fresh) {
                     if (cursor_hidden) {
-                        sdl.show_cursor();
+                        mouse.show_cursor();
                         cursor_hidden = false;
                         print.println("cursor: visible");
                     } or {
-                        sdl.hide_cursor();
+                        mouse.hide_cursor();
                         cursor_hidden = true;
                         print.println("cursor: hidden");
                     }
                 }
-                or (kb.scancode == sdl.SPACE && sdl.key_is_fresh_press(kb)) {
+                or (kd.scancode == key.SPACE && fresh) {
                     if (have_audio) {
-                        sdl.put_data(beep_stream, (?beep[0])::ptr, 2400);
+                        audio.put(beep_stream, ?beep[0], 2400);
                     }
                 }
-                or (kb.scancode == sdl.L && sdl.key_is_fresh_press(kb)) {
+                or (kd.scancode == key.L && fresh) {
                     relative_mode = !relative_mode;
-                    sdl.set_relative_mode(w.handle, relative_mode);
+                    mouse.set_relative(main_win, relative_mode);
                     if (relative_mode) {
                         print.println("mouse: relative mode on");
                     } or {
                         print.println("mouse: relative mode off");
                     }
                 }
-                or (kb.scancode == sdl.N && sdl.key_is_fresh_press(kb)) {
-                    if (w2_minimized) {
-                        sdl.restore(w2);
-                        w2_minimized = false;
+                or (kd.scancode == key.N && fresh) {
+                    if (rend_win_minimized) {
+                        window.restore(rend_win);
+                        rend_win_minimized = false;
                         print.println("renderer window: restored");
                     } or {
-                        sdl.minimize(w2);
-                        w2_minimized = true;
+                        window.minimize(rend_win);
+                        rend_win_minimized = true;
                         print.println("renderer window: minimized");
                     }
                 }
-                or (kb.scancode == sdl.C && sdl.key_is_fresh_press(kb)) {
-                    sdl.set_text("mach-sdl clipboard demo");
+                or (kd.scancode == key.C && fresh) {
+                    clipboard.set_text("mach-sdl clipboard demo");
                     print.println("clipboard: copied demo string");
                 }
-                or (kb.scancode == sdl.V && sdl.key_is_fresh_press(kb)) {
-                    val clip_text: str = sdl.get_text();
-                    print.printf("clipboard: {}\n", clip_text);
-                    sdl.free_text(clip_text);
+                or (kd.scancode == key.V && fresh) {
+                    val pasted: res[str, error.Error] = clipboard.text();
+                    if (sel pasted.ok) {
+                        print.printf("clipboard: {}\n", pasted.ok);
+                        clipboard.free_text(pasted.ok);
+                    } or {
+                        print.println("clipboard: could not read text");
+                    }
                 }
             }
-            or (t == sdl.EVENT_KEY_UP) {
-                val kb: sdl.KeyboardEvent = sdl.as_keyboard(?ev);
-                if (kb.scancode == sdl.W) { move_up = 0; }
-                or (kb.scancode == sdl.S) { move_down = 0; }
-                or (kb.scancode == sdl.A) { move_left = 0; }
-                or (kb.scancode == sdl.D) { move_right = 0; }
+
+            if (sel ev.key_up) {
+                val ku: event.KeyEvent = ev.key_up;
+                if (ku.scancode == key.W) { move_up = 0; }
+                or (ku.scancode == key.S) { move_down = 0; }
+                or (ku.scancode == key.A) { move_left = 0; }
+                or (ku.scancode == key.D) { move_right = 0; }
             }
-            or (t == sdl.EVENT_MOUSE_BUTTON_DOWN) {
-                val mb: sdl.MouseButtonEvent = sdl.as_mouse_button(?ev);
+
+            if (sel ev.mouse_button_down) {
+                val mb: event.MouseButton = ev.mouse_button_down;
                 print.printf("mouse btn {} at ({}, {})\n", mb.button, mb.x::i64, mb.y::i64);
             }
-            or (t == sdl.EVENT_MOUSE_WHEEL) {
-                val mw: sdl.MouseWheelEvent = sdl.as_mouse_wheel(?ev);
-                print.printf("mouse wheel x={} y={}\n", mw.x::i64, mw.y::i64);
+
+            if (sel ev.mouse_wheel) {
+                val mw: event.MouseWheel = ev.mouse_wheel;
+                print.printf("mouse wheel x={} y={}\n", mw.dx::i64, mw.dy::i64);
             }
-            or (t == sdl.EVENT_WINDOW_RESIZED) {
-                val we: sdl.WindowEvent = sdl.as_window(?ev);
-                win_w = we.data1::f32;
-                win_h = we.data2::f32;
-                viewport(0, 0, we.data1, we.data2);
+
+            if (sel ev.window_resized) {
+                val we: event.WindowEvent = ev.window_resized;
+                win_w = we.width::f32;
+                win_h = we.height::f32;
+                viewport(0, 0, we.width, we.height);
                 matrix_mode(GL_PROJECTION);
                 load_id();
                 ortho(0.0, win_w::f64, win_h::f64, 0.0, -1.0, 1.0);
                 matrix_mode(GL_MODELVIEW);
                 collectible = spawn_collectible(win_w, win_h);
-                print.printf("window resized: {}x{}\n", we.data1, we.data2);
+                print.printf("window resized: {}x{}\n", we.width, we.height);
             }
         }
 
-        val dt: f64 = sdl.tick(?clk);
+        val dt: f64 = timer.tick(?clk);
         val dist: f32 = MOVE_SPEED * (dt::f32);
 
         if (move_up    != 0) { py = py - dist; }
@@ -333,14 +374,13 @@ fun main(argc: i64, argv: **u8) i64 {
         if (px > win_w - HALF) { px = win_w - HALF; }
         if (py > win_h - HALF) { py = win_h - HALF; }
 
-        # poll mouse position
-        var mx: f32 = 0.0;
-        var my: f32 = 0.0;
-        sdl.get_state(?mx, ?my);
+        val cursor: mouse.State = mouse.state();
+        val mx: f32 = cursor.x;
+        val my: f32 = cursor.y;
 
-        # collectible collision via rect.intersects
-        val player_rect: sdl.FRect = sdl.FRect{ x: px - HALF, y: py - HALF, w: HALF * 2.0, h: HALF * 2.0 };
-        if (sdl.intersects(player_rect, collectible)) {
+        # collectible collision through rect.intersects
+        val player_rect: rect.FRect = rect.FRect{ x: px - HALF, y: py - HALF, w: HALF * 2.0, h: HALF * 2.0 };
+        if (rect.intersects(player_rect, collectible)) {
             score = score + 1;
             print.printf("collected! score: {}\n", score);
             collectible = spawn_collectible(win_w, win_h);
@@ -348,9 +388,11 @@ fun main(argc: i64, argv: **u8) i64 {
 
         print_accum = print_accum + dt;
         if (print_accum >= 2.0) {
-            val sz: sdl.Size = sdl.get_size(w);
-            print.printf("pos=({},{}) mouse=({},{}) size={}x{} score={}\n",
-                px::i64, py::i64, mx::i64, my::i64, sz.w, sz.h, score);
+            val sz: res[window.Size, error.Error] = window.size(main_win);
+            if (sel sz.ok) {
+                print.printf("pos=({},{}) mouse=({},{}) size={}x{} score={}\n",
+                    px::i64, py::i64, mx::i64, my::i64, sz.ok.w, sz.ok.h, score);
+            }
             print_accum = 0.0;
         }
 
@@ -367,102 +409,98 @@ fun main(argc: i64, argv: **u8) i64 {
         draw_square(gl_begin, gl_end, vertex2f, color3f,
                     px, py, 0.9, 0.4, 0.2);
 
-        # mouse cursor crosshair: draw_line equivalent using GL directly
+        # mouse position: a tiny 4px square following the cursor
         color3f(0.5, 0.5, 0.8);
-        gl_begin(GL_QUADS);  # tiny 2px square at cursor position
+        gl_begin(GL_QUADS);
         vertex2f(mx - 2.0, my - 2.0);
         vertex2f(mx + 2.0, my - 2.0);
         vertex2f(mx + 2.0, my + 2.0);
         vertex2f(mx - 2.0, my + 2.0);
         gl_end();
 
-        sdl.swap_window(w);
+        gl.swap(main_win);
 
-        # --- draw: renderer window (blue-tinted scale-down of the same scene) ---
-        sdl.set_draw_color(rend, 15, 15, 22, 255);
-        sdl.clear(rend);
+        # --- draw: renderer window (a scaled-down copy of the same scene) ---
+        renderer.set_color(rend, color_of(15, 15, 22, 255));
+        renderer.clear(rend);
 
         val scale_x: f32 = 280.0 / win_w;
         val scale_y: f32 = 280.0 / win_h;
 
-        # collectible in renderer window
-        val coll_scaled: sdl.FRect = sdl.FRect{
+        # collectible in the renderer window
+        val coll_scaled: rect.FRect = rect.FRect{
             x: (collectible.x + HALF) * scale_x - HALF * 0.4,
             y: (collectible.y + HALF) * scale_y - HALF * 0.4,
             w: HALF * 0.8,
             h: HALF * 0.8
         };
-        sdl.set_draw_color(rend, 50, 230, 80, 255);
-        sdl.fill_rect(rend, coll_scaled);
+        renderer.set_color(rend, color_of(50, 230, 80, 255));
+        renderer.fill_rect(rend, coll_scaled);
 
-        # player in renderer window
-        val player_scaled: sdl.FRect = sdl.FRect{
+        # player in the renderer window
+        val player_scaled: rect.FRect = rect.FRect{
             x: px * scale_x - HALF * 0.4,
             y: py * scale_y - HALF * 0.4,
             w: HALF * 0.8,
             h: HALF * 0.8
         };
-        sdl.set_draw_color(rend, 230, 100, 50, 255);
-        sdl.fill_rect(rend, player_scaled);
+        renderer.set_color(rend, color_of(230, 100, 50, 255));
+        renderer.fill_rect(rend, player_scaled);
 
-        # border outline on the renderer window (exercises draw_rect)
-        val border: sdl.FRect = sdl.FRect{ x: 1.0, y: 1.0, w: 278.0, h: 278.0 };
-        sdl.set_draw_color(rend, 80, 80, 120, 255);
-        sdl.draw_rect(rend, border);
+        # border outline (draw_rect)
+        val border: rect.FRect = rect.FRect{ x: 1.0, y: 1.0, w: 278.0, h: 278.0 };
+        renderer.set_color(rend, color_of(80, 80, 120, 255));
+        renderer.draw_rect(rend, border);
 
-        # --- phase 1 additions: blend mode, clip rect, bulk draws ---
-
-        # translucent halo behind the collectible -- exercises blend mode
-        sdl.set_blend_mode(rend, sdl.BLEND_BLEND);
-        val halo: sdl.FRect = sdl.FRect{
+        # translucent halo behind the collectible (set_blend)
+        renderer.set_blend(rend, renderer.Blend.blend{});
+        val halo: rect.FRect = rect.FRect{
             x: coll_scaled.x - 4.0, y: coll_scaled.y - 4.0,
             w: coll_scaled.w + 8.0, h: coll_scaled.h + 8.0
         };
-        sdl.set_draw_color(rend, 50, 230, 80, 90);
-        sdl.fill_rect(rend, halo);
-        sdl.set_blend_mode(rend, sdl.BLEND_NONE);
+        renderer.set_color(rend, color_of(50, 230, 80, 90));
+        renderer.fill_rect(rend, halo);
+        renderer.set_blend(rend, renderer.Blend.none{});
 
-        # a small corner starfield + connecting line, clipped to the
-        # top-left quadrant -- exercises set_clip_rect, render_points,
-        # render_lines
-        val star_clip: sdl.Rect = sdl.Rect{ x: 0, y: 0, w: 140, h: 140 };
-        sdl.set_clip_rect(rend, star_clip);
+        # a corner starfield and a connecting line, clipped to the top-left
+        # quadrant (set_clip, draw_points, draw_lines, clear_clip)
+        val star_clip: rect.Rect = rect.Rect{ x: 0, y: 0, w: 140, h: 140 };
+        renderer.set_clip(rend, star_clip);
 
-        var star_points: [5]sdl.FPoint;
-        star_points[0] = sdl.FPoint{ x: 10.0, y: 10.0 };
-        star_points[1] = sdl.FPoint{ x: 15.0, y: 25.0 };
-        star_points[2] = sdl.FPoint{ x: 22.0, y: 12.0 };
-        star_points[3] = sdl.FPoint{ x: 30.0, y: 28.0 };
-        star_points[4] = sdl.FPoint{ x: 35.0, y: 15.0 };
-        sdl.set_draw_color(rend, 255, 255, 255, 255);
-        sdl.render_points(rend, (?star_points[0])::ptr, 5);
-        sdl.set_draw_color(rend, 120, 180, 255, 255);
-        sdl.render_lines(rend, (?star_points[0])::ptr, 5);
+        var star_points: [5]rect.FPoint;
+        star_points[0] = rect.FPoint{ x: 10.0, y: 10.0 };
+        star_points[1] = rect.FPoint{ x: 15.0, y: 25.0 };
+        star_points[2] = rect.FPoint{ x: 22.0, y: 12.0 };
+        star_points[3] = rect.FPoint{ x: 30.0, y: 28.0 };
+        star_points[4] = rect.FPoint{ x: 35.0, y: 15.0 };
+        renderer.set_color(rend, color_of(255, 255, 255, 255));
+        renderer.draw_points(rend, ?star_points[0], 5);
+        renderer.set_color(rend, color_of(120, 180, 255, 255));
+        renderer.draw_lines(rend, ?star_points[0], 5);
 
-        sdl.clear_clip_rect(rend);
+        renderer.clear_clip(rend);
 
-        # a few tick marks along the bottom edge -- exercises fill_rects
-        var tick_rects: [3]sdl.FRect;
-        tick_rects[0] = sdl.FRect{ x: 20.0, y: 268.0, w: 4.0, h: 8.0 };
-        tick_rects[1] = sdl.FRect{ x: 40.0, y: 268.0, w: 4.0, h: 8.0 };
-        tick_rects[2] = sdl.FRect{ x: 60.0, y: 268.0, w: 4.0, h: 8.0 };
-        sdl.set_draw_color(rend, 255, 200, 60, 255);
-        sdl.fill_rects(rend, (?tick_rects[0])::ptr, 3);
+        # tick marks along the bottom edge (fill_rects)
+        var tick_rects: [3]rect.FRect;
+        tick_rects[0] = rect.FRect{ x: 20.0, y: 268.0, w: 4.0, h: 8.0 };
+        tick_rects[1] = rect.FRect{ x: 40.0, y: 268.0, w: 4.0, h: 8.0 };
+        tick_rects[2] = rect.FRect{ x: 60.0, y: 268.0, w: 4.0, h: 8.0 };
+        renderer.set_color(rend, color_of(255, 200, 60, 255));
+        renderer.fill_rects(rend, ?tick_rects[0], 3);
 
-        sdl.present(rend);
+        renderer.present(rend);
     }
 
-    # msgbox on exit -- blocks until OK, confirming blocking behavior
-    val nil_win: sdl.Window = sdl.Window{ handle: nil };
-    sdl.info("mach-sdl demo", "clean shutdown. all modules exercised.", nil_win);
+    # message box on exit: it blocks until OK, which shows blocking works
+    msgbox.show(msgbox.Kind.info{}, "mach-sdl demo", "clean shutdown. all modules exercised.", window.Window{ handle: nil });
 
-    if (relative_mode) { sdl.set_relative_mode(w.handle, false); }
-    if (have_audio)   { sdl.destroy(beep_stream); }
-    sdl.destroy_renderer(rend);
-    sdl.destroy_window(w2);
-    sdl.destroy_context(ctx);
-    sdl.destroy_window(w);
-    sdl.quit();
+    if (relative_mode) { mouse.set_relative(main_win, false); }
+    if (have_audio)    { audio.close(beep_stream); }
+    renderer.destroy(rend);
+    window.destroy(rend_win);
+    gl.destroy_context(ctx);
+    window.destroy(main_win);
+    core.quit();
     print.println("clean shutdown, bye");
     ret 0;
 }

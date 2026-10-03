@@ -1,15 +1,17 @@
-# physical key scancodes
+# physical key scancodes and keyboard state (sdl.key)
 #
-# scancode identifies a physical key position, independent of keyboard
-# layout (SDL_scancode.h calls this "the American Standard" position);
-# use these against KeyboardEvent.scancode for movement/action keys where
-# you want the same physical key regardless of layout (WASD stays under
-# the left hand on an AZERTY board, for instance). use `key` (the
-# SDL_Keycode) instead when you care what character the user's layout
-# actually produces -- not bound yet, add it if something needs it.
-#
-# transcribed straight from SDL_scancode.h, tag release-3.2.0.
+# a scancode names a physical key position, independent of keyboard layout.
+# use it against KeyEvent.scancode and is_down(); it is the right choice for
+# movement and action keys (WASD stays under the left hand on an AZERTY
+# board, for instance). values come from SDL_scancode.h and SDL_keycode.h
+# (SDL 3.2.x).
 
+use sdl.c;
+use std.types.bool.bool;
+use std.types.bool.false;
+use std.types.size.usize;
+
+# letters
 pub val A: u32 = 4;
 pub val B: u32 = 5;
 pub val C: u32 = 6;
@@ -37,6 +39,7 @@ pub val X: u32 = 27;
 pub val Y: u32 = 28;
 pub val Z: u32 = 29;
 
+# top-row digits
 pub val NUM_1: u32 = 30;
 pub val NUM_2: u32 = 31;
 pub val NUM_3: u32 = 32;
@@ -48,33 +51,66 @@ pub val NUM_8: u32 = 37;
 pub val NUM_9: u32 = 38;
 pub val NUM_0: u32 = 39;
 
-pub val RETURN:    u32 = 40;
-pub val ESCAPE:    u32 = 41;
+# control and whitespace
+pub val RETURN: u32 = 40;
+pub val ESCAPE: u32 = 41;
 pub val BACKSPACE: u32 = 42;
-pub val TAB:       u32 = 43;
-pub val SPACE:     u32 = 44;
+pub val TAB: u32 = 43;
+pub val SPACE: u32 = 44;
 
-pub val F1:  u32 = 58;
-pub val F2:  u32 = 59;
-pub val F3:  u32 = 60;
-pub val F4:  u32 = 61;
-pub val F5:  u32 = 62;
-pub val F6:  u32 = 63;
-pub val F7:  u32 = 64;
-pub val F8:  u32 = 65;
-pub val F9:  u32 = 66;
+# function keys
+pub val F1: u32 = 58;
+pub val F2: u32 = 59;
+pub val F3: u32 = 60;
+pub val F4: u32 = 61;
+pub val F5: u32 = 62;
+pub val F6: u32 = 63;
+pub val F7: u32 = 64;
+pub val F8: u32 = 65;
+pub val F9: u32 = 66;
 pub val F10: u32 = 67;
 pub val F11: u32 = 68;
 pub val F12: u32 = 69;
 
+# arrows
 pub val RIGHT: u32 = 79;
-pub val LEFT:  u32 = 80;
-pub val DOWN:  u32 = 81;
-pub val UP:    u32 = 82;
+pub val LEFT: u32 = 80;
+pub val DOWN: u32 = 81;
+pub val UP: u32 = 82;
 
-pub val LCTRL:  u32 = 224;
+# modifiers (physical keys)
+pub val LCTRL: u32 = 224;
 pub val LSHIFT: u32 = 225;
-pub val LALT:   u32 = 226;
-pub val RCTRL:  u32 = 228;
+pub val LALT: u32 = 226;
+pub val RCTRL: u32 = 228;
 pub val RSHIFT: u32 = 229;
-pub val RALT:   u32 = 230;
+pub val RALT: u32 = 230;
+
+# modifier bits, tested against KeyEvent.mods and the result of mods()
+# (SDL_KMOD_* in SDL_keycode.h). MOD_SHIFT covers either shift key, and so
+# on for the others.
+pub val MOD_SHIFT: u16 = 0x0003;
+pub val MOD_CTRL:  u16 = 0x00C0;
+pub val MOD_ALT:   u16 = 0x0300;
+pub val MOD_GUI:   u16 = 0x0C00;
+
+
+# whether the key with this scancode is held down right now
+# ---
+# scancode: a key constant from this module (e.g. ESCAPE)
+# ret:      true while held; false for an out-of-range scancode
+pub fun is_down(scancode: u32) bool {
+    var count: i32 = 0;
+    val state: *u8 = c.SDL_GetKeyboardState(?count)::*u8;
+    if (scancode >= count::u32) {
+        ret false;
+    }
+    ret state[scancode::usize] != 0;
+}
+
+# the modifier keys held right now, as a bitmask of MOD_* values
+# ---
+# ret: the modifier bits; test with e.g. (key.mods() & key.MOD_CTRL) != 0
+pub fun mods() u16 {
+    ret c.SDL_GetModState();
+}

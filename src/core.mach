@@ -1,79 +1,53 @@
-# library lifecycle and error query
+# library lifecycle and headless drivers (sdl.core)
 #
-# wraps SDL_Init/SDL_Quit/SDL_GetError with mach-idiomatic types. all
-# functions are thin wrappers over sdl.c -- SDL3's bool is a real 1-byte
-# C99 bool, unwrapped here the same way mach-glfw unwraps GLFW's
-# int-based booleans (`!= 0`).
+# wraps SDL_Init, SDL_Quit and the driver hints. failures are reported as
+# err[error.Error]; the SDL text is read with error.message().
 
 use sdl.c;
-use std.types.bool.bool;
-use std.types.string.str;
+use sdl.error;
+use std.types.error.err;
 
-pub val INIT_VIDEO:  u32 = c.INIT_VIDEO;
-pub val INIT_AUDIO:  u32 = c.INIT_AUDIO;
-pub val INIT_EVENTS: u32 = c.INIT_EVENTS;
+# subsystem flags for init(), combined with |
+pub val VIDEO:  u32 = c.INIT_VIDEO;
+pub val AUDIO:  u32 = c.INIT_AUDIO;
+pub val EVENTS: u32 = c.INIT_EVENTS;
 
-# initialize SDL subsystems. call before creating a window
+# turn an SDL bool result into err[error.Error]
 # ---
-# flags: bitwise OR of INIT_* values
-# ret:   true on success; check get_error() on false
-pub fun init(flags: u32) bool {
-    ret c.SDL_Init(flags) != 0;
+# succeeded: the u8 result of an SDL call, nonzero on success
+fun to_err(succeeded: u8) err[error.Error] {
+    if (succeeded == 0) {
+        ret err[error.Error].err{ error.Error.failed{} };
+    }
+    ret err[error.Error].ok{};
 }
 
-# shut down all SDL subsystems and free resources
+# initialize the given SDL subsystems. call before creating a window
+# ---
+# flags: bitwise OR of VIDEO, AUDIO, EVENTS
+# ret:   ok, or err with error.Error.failed (text from error.message())
+pub fun init(flags: u32) err[error.Error] {
+    ret to_err(c.SDL_Init(flags));
+}
+
+# shut down all SDL subsystems and free their resources
 pub fun quit() {
     c.SDL_Quit();
 }
 
-# the last error message set on this thread
+# force SDL's headless "dummy" video driver. call before init(VIDEO)
 #
-# SDL owns the returned string; it's valid until the next SDL call that
-# sets a new error. copy it before calling anything else if you need to
-# keep it.
+# this lets tests and tooling run SDL without a display server. windows
+# created under it cannot use OpenGL, so gl.create_context fails there.
 # ---
-# ret: a UTF-8, SDL-owned string; never nil, but may be empty
-pub fun get_error() str {
-    ret c.SDL_GetError();
+# ret: ok, or err with error.Error.failed
+pub fun use_dummy_video() err[error.Error] {
+    ret to_err(c.SDL_SetHint("SDL_VIDEO_DRIVER", "dummy"));
 }
 
-# force SDL's headless "dummy" video driver -- call before init().
-#
-# this exists for automated testing without a real display (it's what
-# lets the test blocks below actually call SDL_Init/SDL_CreateWindow for
-# real, not just skip them), but it's genuinely useful outside tests too:
-# any tooling that needs SDL_Init to succeed on a machine with no display
-# server -- headless CI, a build server, a container -- can call this
-# first.
-#
-# note: the dummy driver does NOT support OpenGL. windows created under
-# it work for testing window/event plumbing, but gl.create_context will
-# fail -- that's expected, not a bug. GL-context paths stay demo-only,
-# exercised by actually running main.mach on a real display.
+# force SDL's headless "dummy" audio driver. call before init(AUDIO)
 # ---
-# ret: true on success
-pub fun use_dummy_video_driver() bool {
-    ret c.SDL_SetHint("SDL_VIDEO_DRIVER", "dummy") != 0;
-}
-
-# force SDL's headless "dummy" audio driver -- same idea as
-# use_dummy_video_driver, for testing sdl.audio without a real sound
-# device. call before init(INIT_AUDIO).
-# ---
-# ret: true on success
-pub fun use_dummy_audio_driver() bool {
-    ret c.SDL_SetHint("SDL_AUDIO_DRIVER", "dummy") != 0;
-}
-
-test core_get_error_is_non_nil_before_init {
-    val msg: str = get_error();
-    if (msg == nil) { ret 1; }
-    ret 0;
-}
-
-test core_init_quit_round_trip_succeeds_under_the_dummy_driver {
-    if (!use_dummy_video_driver()) { ret 1; }
-    if (!init(INIT_VIDEO)) { ret 1; }
-    quit();
-    ret 0;
+# ret: ok, or err with error.Error.failed
+pub fun use_dummy_audio() err[error.Error] {
+    ret to_err(c.SDL_SetHint("SDL_AUDIO_DRIVER", "dummy"));
 }

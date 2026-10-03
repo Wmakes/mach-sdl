@@ -1,45 +1,63 @@
-# system clipboard text access
+# clipboard text (sdl.clipboard)
 #
-# text only -- no clipboard images or custom mime types (SDL_ClipboardData
-# and friends), which is a bigger surface than anything else bound in
-# this project so far. deferred until something needs it.
+# text only: no clipboard images or custom mime types.
 #
-# KNOWN GAP: get_text() hands back the raw SDL-owned pointer, not a
-# copy -- unlike core.get_error() (which reuses a thread-local buffer
-# SDL manages for you), SDL_GetClipboardText allocates a fresh buffer on
-# every call that the CALLER must free. call free_text() on whatever
-# get_text() returns once you're done with it, or it leaks. this
-# binding doesn't copy it into an owned string automatically because
-# doing so would need an allocator dependency this project doesn't
-# otherwise have (see std.allocator in mach-std, used by str_copy) --
-# flagging rather than silently assuming it's safe to treat like an
-# ordinary str.
+# SDL_GetClipboardText hands out a fresh heap allocation on every call, so
+# the string returned by text() is NOT borrowed like error.message(): give it
+# back with free_text() when done, or it leaks. the binding does not copy it
+# into an owned string because that would need an allocator.
 
 use sdl.c;
+use sdl.error;
 use std.types.bool.bool;
+use std.types.error.err;
+use std.types.result.res;
 use std.types.string.str;
 
+# turn an SDL bool result into err[error.Error]
+# ---
+# succeeded: the u8 result of an SDL call, nonzero on success
+fun to_err(succeeded: u8) err[error.Error] {
+    if (succeeded == 0) {
+        ret err[error.Error].err{ error.Error.failed{} };
+    }
+    ret err[error.Error].ok{};
+}
+
 # whether the clipboard currently holds text
+# ---
+# ret: true if there is text to read
 pub fun has_text() bool {
     ret c.SDL_HasClipboardText() != 0;
 }
 
-# set the clipboard's text content
-pub fun set_text(text: str) bool {
-    ret c.SDL_SetClipboardText(text) != 0;
-}
-
-# the clipboard's current text content
-#
-# see the KNOWN GAP above -- free the result with free_text() when done.
+# replace the clipboard's text
 # ---
-# ret: an SDL-owned string; never nil, but empty on failure or an empty
-#      clipboard
-pub fun get_text() str {
-    ret c.SDL_GetClipboardText();
+# text: the new clipboard text
+# ret:  ok, or error.Error.failed (text from error.message())
+pub fun set_text(text: str) err[error.Error] {
+    ret to_err(c.SDL_SetClipboardText(text));
 }
 
-# free a string previously returned by get_text()
+# the clipboard's current text. release it with free_text
+#
+# an empty clipboard gives an empty string, not an error. use has_text to
+# tell the two apart.
+# ---
+# ret: the text (SDL-allocated, caller must call free_text), or
+#      error.Error.failed (text from error.message())
+pub fun text() res[str, error.Error] {
+    val raw: *u8 = c.SDL_GetClipboardText();
+    if (raw == nil) {
+        ret res[str, error.Error].err{ error.Error.failed{} };
+    }
+    val s: str = raw;
+    ret res[str, error.Error].ok{ s };
+}
+
+# release a string returned by text()
+# ---
+# text: the string to free; do not use it afterwards
 pub fun free_text(text: str) {
     c.SDL_free(text::ptr);
 }
