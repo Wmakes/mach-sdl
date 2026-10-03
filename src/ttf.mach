@@ -1,0 +1,127 @@
+# raw C-ABI imports of SDL3_ttf 3.2
+#
+# every function is a pub ext fun with its C name and C-faithful types,
+# transcribed from SDL3_ttf's SDL_ttf.h (release-3.2.2). it lives apart from
+# sdl.c because SDL3_ttf is a separate shared library (libSDL3_ttf) with its
+# own link entry in mach.toml, bound as library "sdl-ttf".
+#
+# conventions match sdl.c: SDL's `bool` is a 1-byte C99 _Bool, so every
+# bool-returning or bool-taking function is declared u8. TTF_Font is opaque
+# and held as ptr. `const char *` is *u8. `size_t` is usize.
+#
+# SDL_Color is passed BY VALUE to the TTF_RenderText_* functions. it is a
+# 4-byte struct of four Uint8 (r, g, b, a in memory order), which both
+# SysV x86-64 and Win64 pass as a single integer register, bit-identical to
+# a u32 whose little-endian bytes are r, g, b, a. every color parameter is
+# therefore declared u32 and packed by the idiomatic layer (sdl.font.pack).
+# this avoids relying on by-value rec passing in `ext fun`, which no other
+# binding in this project exercises. UNVERIFIED on aarch64 and darwin: all
+# declared targets in mach.toml are x86_64, where the argument above holds.
+#
+# text length: every render and measure function takes a `length`. 0 means
+# "the string is NUL-terminated, use strlen", which is what the idiomatic
+# layer always passes.
+
+use std.types.size.usize;
+
+# --- init / version ---
+
+#[library("sdl-ttf")]
+pub ext fun TTF_Version() i32;
+#[library("sdl-ttf")]
+pub ext fun TTF_Init() u8;
+#[library("sdl-ttf")]
+pub ext fun TTF_Quit();
+#[library("sdl-ttf")]
+pub ext fun TTF_WasInit() i32;
+
+# --- font lifetime ---
+
+#[library("sdl-ttf")]
+pub ext fun TTF_OpenFont(file: *u8, ptsize: f32) ptr;
+#[library("sdl-ttf")]
+pub ext fun TTF_CloseFont(font: ptr);
+
+# --- style flags (TTF_FontStyleFlags, a Uint32 bit set) ---
+
+pub val STYLE_NORMAL:        u32 = 0x00;
+pub val STYLE_BOLD:          u32 = 0x01;
+pub val STYLE_ITALIC:        u32 = 0x02;
+pub val STYLE_UNDERLINE:     u32 = 0x04;
+pub val STYLE_STRIKETHROUGH: u32 = 0x08;
+
+# --- hinting (TTF_HintingFlags, a plain C enum, int-sized) ---
+
+pub val HINTING_NORMAL:         i32 = 0;
+pub val HINTING_LIGHT:          i32 = 1;
+pub val HINTING_MONO:           i32 = 2;
+pub val HINTING_NONE:           i32 = 3;
+pub val HINTING_LIGHT_SUBPIXEL: i32 = 4;
+
+# --- font properties ---
+
+#[library("sdl-ttf")]
+pub ext fun TTF_SetFontSize(font: ptr, ptsize: f32) u8;
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontSize(font: ptr) f32;
+#[library("sdl-ttf")]
+pub ext fun TTF_SetFontStyle(font: ptr, style: u32);
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontStyle(font: ptr) u32;
+#[library("sdl-ttf")]
+pub ext fun TTF_SetFontOutline(font: ptr, outline: i32) u8;
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontOutline(font: ptr) i32;
+#[library("sdl-ttf")]
+pub ext fun TTF_SetFontHinting(font: ptr, hinting: i32);
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontHinting(font: ptr) i32;
+#[library("sdl-ttf")]
+pub ext fun TTF_SetFontKerning(font: ptr, enabled: u8);
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontKerning(font: ptr) u8;
+#[library("sdl-ttf")]
+pub ext fun TTF_FontIsFixedWidth(font: ptr) u8;
+
+# the family and style names are font-owned and borrowed; NULL if absent
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontFamilyName(font: ptr) *u8;
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontStyleName(font: ptr) *u8;
+
+# --- font metrics, in pixels ---
+
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontHeight(font: ptr) i32;
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontAscent(font: ptr) i32;
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontDescent(font: ptr) i32;
+#[library("sdl-ttf")]
+pub ext fun TTF_GetFontLineSkip(font: ptr) i32;
+
+# --- measuring text ---
+
+#[library("sdl-ttf")]
+pub ext fun TTF_GetStringSize(font: ptr, text: *u8, length: usize, w: *i32, h: *i32) u8;
+#[library("sdl-ttf")]
+pub ext fun TTF_GetStringSizeWrapped(font: ptr, text: *u8, length: usize, wrap_width: i32, w: *i32, h: *i32) u8;
+
+# --- rendering text to an SDL_Surface (caller owns it: SDL_DestroySurface) ---
+#
+# solid:   8-bit palettized, fastest, hard edges, no antialiasing
+# shaded:  8-bit palettized, antialiased against a solid background color
+# blended: 32-bit ARGB, antialiased with real alpha, the usual choice
+#
+# each returns NULL on failure. empty text also fails in SDL3_ttf, so the
+# idiomatic layer reports it as error.Error.failed like any other failure.
+# SDL_Color arguments are u32, see the header comment.
+
+#[library("sdl-ttf")]
+pub ext fun TTF_RenderText_Solid(font: ptr, text: *u8, length: usize, fg: u32) ptr;
+#[library("sdl-ttf")]
+pub ext fun TTF_RenderText_Shaded(font: ptr, text: *u8, length: usize, fg: u32, bg: u32) ptr;
+#[library("sdl-ttf")]
+pub ext fun TTF_RenderText_Blended(font: ptr, text: *u8, length: usize, fg: u32) ptr;
+#[library("sdl-ttf")]
+pub ext fun TTF_RenderText_Blended_Wrapped(font: ptr, text: *u8, length: usize, fg: u32, wrap_width: i32) ptr;

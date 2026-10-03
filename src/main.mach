@@ -20,9 +20,16 @@
 #   clipboard  set_text / text / free_text round trip (C and V)
 #   msgbox     info dialog on exit (blocks until you click OK)
 #   error      message() for every failure report
+#   font       init, open (expected failure + real font), family_name, height,
+#              measure, set_style, render_texture / render_texture_wrapped:
+#              a live score label and a static help label in the renderer
+#              window
 #
 # controls: WASD move, SPACE beep, M cursor, F fullscreen, L relative mouse,
 # N minimize / restore the renderer window, C copy, V paste, ESC quit.
+#
+# font: pass a .ttf path as the first argument, otherwise a few common system
+# fonts are tried. with no usable font the demo runs without text.
 
 use std.runtime;
 use print: std.print;
@@ -41,6 +48,7 @@ use sdl.color.Color;
 use sdl.core;
 use sdl.error;
 use sdl.event;
+use sdl.font;
 use sdl.gl;
 use sdl.key;
 use sdl.mouse;
@@ -122,6 +130,50 @@ fun spawn_collectible(win_w: f32, win_h: f32) rect.FRect {
     val cx: f32 = rand.range(HALF + 5.0, win_w - HALF - 5.0);
     val cy: f32 = rand.range(HALF + 5.0, win_h - HALF - 5.0);
     ret rect.FRect{ x: cx - HALF, y: cy - HALF, w: HALF * 2.0, h: HALF * 2.0 };
+}
+
+# write "Score: <n>" as a NUL-terminated string into buf (32 bytes is plenty)
+fun format_score(buf: *u8, n: i64) {
+    buf[0] = 0x53;
+    buf[1] = 0x63;
+    buf[2] = 0x6F;
+    buf[3] = 0x72;
+    buf[4] = 0x65;
+    buf[5] = 0x3A;
+    buf[6] = 0x20;
+
+    var digits: [20]u8;
+    var count: usize = 0;
+    var rest: i64 = n;
+    if (rest <= 0) {
+        digits[0] = 0x30;
+        count = 1;
+    }
+    for (rest > 0) {
+        digits[count] = (0x30 + (rest % 10))::u8;
+        rest = rest / 10;
+        count = count + 1;
+    }
+    var i: usize = 0;
+    for (i < count) {
+        buf[7 + i] = digits[count - 1 - i];
+        i = i + 1;
+    }
+    buf[7 + count] = 0;
+}
+
+# try a few common system font locations, so the demo needs no bundled asset.
+# returns the last failure when none exists
+fun open_any_font(size: f32) res[font.Font, error.Error] {
+    val a: res[font.Font, error.Error] = font.open("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size);
+    if (sel a.ok) { ret a; }
+    val b: res[font.Font, error.Error] = font.open("/usr/share/fonts/TTF/DejaVuSans.ttf", size);
+    if (sel b.ok) { ret b; }
+    val c: res[font.Font, error.Error] = font.open("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf", size);
+    if (sel c.ok) { ret c; }
+    val d: res[font.Font, error.Error] = font.open("C:/Windows/Fonts/arial.ttf", size);
+    if (sel d.ok) { ret d; }
+    ret font.open("/System/Library/Fonts/Supplemental/Arial.ttf", size);
 }
 
 #[symbol("main")]
@@ -227,6 +279,77 @@ fun main(argc: i64, argv: **u8) i64 {
     }
     var beep: [2400]u8;
     fill_beep(?beep[0]);
+
+    # --- text (SDL3_ttf) ---
+    var have_ttf:  bool = false;
+    var have_font: bool = false;
+    var fnt: font.Font = font.Font{ handle: nil };
+    var score_tex: renderer.Texture = renderer.Texture{ handle: nil };
+    var help_tex:  renderer.Texture = renderer.Texture{ handle: nil };
+    var score_buf: [32]u8;
+    var score_w: f32 = 0.0;
+    var score_h: f32 = 0.0;
+    var help_w:  f32 = 0.0;
+    var help_h:  f32 = 0.0;
+    var shown_score: i64 = 0 - 1;
+
+    val ttf_started: err[error.Error] = font.init();
+    if (sel ttf_started.ok) {
+        have_ttf = true;
+        print.printf("SDL3_ttf version: {}\n", font.version());
+
+        # no such file, so this must fail cleanly: the error path of font.open
+        val bad_font: res[font.Font, error.Error] = font.open("nonexistent.ttf", 16.0);
+        if (sel bad_font.err) {
+            print.println("font open (expected failure): ok, no crash, error reported cleanly");
+        }
+        if (sel bad_font.ok) {
+            font.close(bad_font.ok);
+        }
+
+        var font_res: res[font.Font, error.Error];
+        if (argc > 1) {
+            font_res = font.open(argv[1], 20.0);
+        } or {
+            font_res = open_any_font(20.0);
+        }
+
+        if (sel font_res.ok) {
+            fnt = font_res.ok;
+            have_font = true;
+
+            val family: res[str, error.Error] = font.family_name(fnt);
+            if (sel family.ok) { print.printf("font: {}\n", family.ok); }
+            val line_h: res[i32, error.Error] = font.height(fnt);
+            if (sel line_h.ok) { print.printf("font height: {}px\n", line_h.ok); }
+            val probe: res[font.TextSize, error.Error] = font.measure(fnt, "mach-sdl");
+            if (sel probe.ok) { print.printf("measure \"mach-sdl\": {}x{}\n", probe.ok.w, probe.ok.h); }
+
+            # static two-line help label, rendered once (newlines only wrap)
+            val help: res[texture.Texture, error.Error] = font.render_texture_wrapped(rend, fnt, "WASD to move\nESC to quit", color_of(180, 180, 200, 255), 0);
+            if (sel help.ok) {
+                help_tex = help.ok;
+                val hs: res[texture.Size, error.Error] = texture.size(help_tex);
+                if (sel hs.ok) {
+                    help_w = hs.ok.w;
+                    help_h = hs.ok.h;
+                }
+            } or {
+                print.eprint("help label failed: ");
+                print.eprintln(error.message());
+            }
+
+            # the live score label is bold
+            font.set_style(fnt, font.STYLE_BOLD);
+        } or {
+            print.eprint("font unavailable, running without text: ");
+            print.eprintln(error.message());
+            print.println("(pass a .ttf path as the first argument)");
+        }
+    } or {
+        print.eprint("font.init failed, running without text: ");
+        print.eprintln(error.message());
+    }
 
     # --- collectible (rect + rand) ---
     var collectible: rect.FRect = spawn_collectible(win_w, win_h);
@@ -386,6 +509,25 @@ fun main(argc: i64, argv: **u8) i64 {
             collectible = spawn_collectible(win_w, win_h);
         }
 
+        # re-render the score label only when the score changes
+        if (have_font && shown_score != score) {
+            format_score(?score_buf[0], score);
+            val made: res[texture.Texture, error.Error] = font.render_texture(rend, fnt, ?score_buf[0], color_of(255, 255, 255, 255));
+            if (sel made.ok) {
+                texture.destroy(score_tex);
+                score_tex = made.ok;
+                val ss: res[texture.Size, error.Error] = texture.size(score_tex);
+                if (sel ss.ok) {
+                    score_w = ss.ok.w;
+                    score_h = ss.ok.h;
+                }
+            } or {
+                print.eprint("score label failed: ");
+                print.eprintln(error.message());
+            }
+            shown_score = score;
+        }
+
         print_accum = print_accum + dt;
         if (print_accum >= 2.0) {
             val sz: res[window.Size, error.Error] = window.size(main_win);
@@ -488,6 +630,14 @@ fun main(argc: i64, argv: **u8) i64 {
         renderer.set_color(rend, color_of(255, 200, 60, 255));
         renderer.fill_rects(rend, ?tick_rects[0], 3);
 
+        # text labels (font): score top right, help below it
+        if (texture.is_valid(score_tex)) {
+            renderer.draw_texture(rend, score_tex, rect.FRect{ x: 150.0, y: 8.0, w: score_w, h: score_h });
+        }
+        if (texture.is_valid(help_tex)) {
+            renderer.draw_texture(rend, help_tex, rect.FRect{ x: 150.0, y: 40.0, w: help_w, h: help_h });
+        }
+
         renderer.present(rend);
     }
 
@@ -496,6 +646,10 @@ fun main(argc: i64, argv: **u8) i64 {
 
     if (relative_mode) { mouse.set_relative(main_win, false); }
     if (have_audio)    { audio.close(beep_stream); }
+    texture.destroy(score_tex);
+    texture.destroy(help_tex);
+    font.close(fnt);
+    if (have_ttf)      { font.quit(); }
     renderer.destroy(rend);
     window.destroy(rend_win);
     gl.destroy_context(ctx);

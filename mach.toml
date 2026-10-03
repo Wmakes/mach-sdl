@@ -1,6 +1,6 @@
 [project]
 id = "sdl"
-version = "0.1.0"
+version = "0.7.0"
 src = "src"
 out = "out/{target.name}/{profile.name}"
 mach = ">=6.0"
@@ -42,7 +42,7 @@ kind    = "bin"
 entry   = "main.mach"
 out     = "bin/demo{artifact.suffix}"
 targets = ["*"]
-link    = ["sdl", "sdl-win"]
+link    = ["sdl", "sdl-win", "sdl-ttf", "sdl-ttf-win"]
 need    = []
 
 [link.sdl]
@@ -62,6 +62,24 @@ os     = ["windows"]
 isa    = "*"
 abi    = "*"
 export = true
+
+[link.sdl-ttf]
+source  = "system"
+name    = "SDL3_ttf"
+library = "sdl-ttf"
+os      = ["linux", "darwin"]
+isa     = "*"
+abi     = "*"
+export  = true
+
+[link.sdl-ttf-win]
+source  = "system"
+name    = "SDL3_ttf.dll"
+library = "sdl-ttf"
+os      = ["windows"]
+isa     = "*"
+abi     = "*"
+export  = true
 
 [dep.std]
 git = "https://github.com/briar-systems/mach-std"

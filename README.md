@@ -5,8 +5,8 @@ SDL3 bindings for the [mach](https://github.com/briar-systems/mach) programming 
 ## Requirements
 
 * A mach compiler matching the required version range (`mach info` prints your version).
-* **Linux:** The SDL3 development files, so that `libSDL3.so` (not just `libSDL3.so.0`) exists in a standard library directory such as `/usr/lib` or `/usr/lib/<arch>-linux-gnu`.
-* **Windows:** After building your `.exe`, you need to manually copy `SDL3.dll` into the same folder as the executable.
+* **Linux:** The SDL3 development files, so that `libSDL3.so` and  `libSDL3_ttf.so`  (not just `libSDL3.so.0` and `libSDL3_ttf.so.0` ) exists in a standard library directory such as `/usr/lib` or `/usr/lib/<arch>-linux-gnu`.
+* **Windows:** After building your `.exe`, you need to manually copy `SDL3.dll`  and `SDL3_ttf.dll` into the same folder as the executable.
 
 ## Status
 
