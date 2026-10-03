@@ -37,7 +37,7 @@ pub fun rand_bool() bool {
     ret c.SDL_rand(2) == 0;
 }
 
-test "rand: rand_int stays in range over many calls" {
+test rand_rand_int_stays_in_range_over_many_calls {
     seed(42);
     var i: usize = 0;
     for (i < 1000) {
@@ -48,7 +48,7 @@ test "rand: rand_int stays in range over many calls" {
     ret 0;
 }
 
-test "rand: rand_f32 stays in [0.0, 1.0) over many calls" {
+test rand_rand_f32_stays_in_0_0_1_0_over_many_calls {
     seed(42);
     var i: usize = 0;
     for (i < 1000) {
@@ -59,7 +59,7 @@ test "rand: rand_f32 stays in [0.0, 1.0) over many calls" {
     ret 0;
 }
 
-test "rand: same seed gives same sequence" {
+test rand_same_seed_gives_same_sequence {
     seed(12345);
     val a: i32 = rand_int(1000000);
     val b: i32 = rand_int(1000000);

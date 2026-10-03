@@ -7,10 +7,9 @@
 # here and unwrapped with `!= 0` in the idiomatic wrapper modules, the same
 # way mach-glfw unwraps GLFW's int-based booleans in its own core.mach.
 #
-# v2 scope: init/quit, window, GL context, keyboard, mouse, timing, and
-# poll-based gamepad state. still deferred: audio, the 2D renderer,
-# haptics, camera, sensors, and event-driven (as opposed to polled)
-# gamepad button/axis events.
+# scope: init/quit, window, GL context, keyboard, mouse, timing, audio,
+# 2D renderer. gamepad/joystick support was removed. still deferred:
+# haptics, camera, sensors.
 
 # --- SDL_init.h ---
 
@@ -83,7 +82,7 @@ pub rec KeyboardEvent {
 
 pub ext fun SDL_PollEvent(event: *Event) u8;
 
-test "sdl.c: KeyboardEvent layout is 40 bytes" {
+test sdl_c_keyboardevent_layout_is_40_bytes {
     if ($size_of(KeyboardEvent) != 40) { ret 1; }
     ret 0;
 }
@@ -107,7 +106,7 @@ pub rec WindowEvent {
     data2:      i32;
 }
 
-test "sdl.c: WindowEvent layout is 32 bytes" {
+test sdl_c_windowevent_layout_is_32_bytes {
     if ($size_of(WindowEvent) != 32) { ret 1; }
     ret 0;
 }
@@ -146,7 +145,7 @@ pub rec MouseMotionEvent {
     yrel:       f32;
 }
 
-test "sdl.c: MouseMotionEvent layout is 48 bytes" {
+test sdl_c_mousemotionevent_layout_is_48_bytes {
     if ($size_of(MouseMotionEvent) != 48) { ret 1; }
     ret 0;
 }
@@ -168,7 +167,7 @@ pub rec MouseButtonEvent {
     y:          f32;
 }
 
-test "sdl.c: MouseButtonEvent layout is 40 bytes" {
+test sdl_c_mousebuttonevent_layout_is_40_bytes {
     if ($size_of(MouseButtonEvent) != 40) { ret 1; }
     ret 0;
 }
@@ -189,7 +188,7 @@ pub rec MouseWheelEvent {
     mouse_y:    f32;
 }
 
-test "sdl.c: MouseWheelEvent layout is 48 bytes" {
+test sdl_c_mousewheelevent_layout_is_48_bytes {
     if ($size_of(MouseWheelEvent) != 48) { ret 1; }
     ret 0;
 }
@@ -211,7 +210,7 @@ pub rec TextInputEvent {
     text:       *u8;
 }
 
-test "sdl.c: TextInputEvent layout is 32 bytes" {
+test sdl_c_textinputevent_layout_is_32_bytes {
     if ($size_of(TextInputEvent) != 32) { ret 1; }
     ret 0;
 }
@@ -230,43 +229,6 @@ pub ext fun SDL_GetPerformanceCounter() u64;
 pub ext fun SDL_GetPerformanceFrequency() u64;
 pub ext fun SDL_Delay(ms: u32);
 
-# --- SDL_gamepad.h / SDL_joystick.h ---
-#
-# poll-based only: open a gamepad, ask it for button/axis state each
-# frame. no event-driven gamepad handling (button-down/up/connect events)
-# yet -- deferred, same reasoning as everywhere else in this file: add it
-# when something actually needs it.
-
-pub ext fun SDL_HasGamepad() u8;
-pub ext fun SDL_GetGamepads(count: *i32) ptr;
-pub ext fun SDL_OpenGamepad(instance_id: u32) ptr;
-pub ext fun SDL_CloseGamepad(gamepad: ptr);
-pub ext fun SDL_GetGamepadButton(gamepad: ptr, button: i32) u8;
-pub ext fun SDL_GetGamepadAxis(gamepad: ptr, axis: i32) i16;
-
-pub val GAMEPAD_BUTTON_SOUTH:          i32 = 0;
-pub val GAMEPAD_BUTTON_EAST:           i32 = 1;
-pub val GAMEPAD_BUTTON_WEST:           i32 = 2;
-pub val GAMEPAD_BUTTON_NORTH:          i32 = 3;
-pub val GAMEPAD_BUTTON_BACK:           i32 = 4;
-pub val GAMEPAD_BUTTON_GUIDE:          i32 = 5;
-pub val GAMEPAD_BUTTON_START:          i32 = 6;
-pub val GAMEPAD_BUTTON_LEFT_STICK:     i32 = 7;
-pub val GAMEPAD_BUTTON_RIGHT_STICK:    i32 = 8;
-pub val GAMEPAD_BUTTON_LEFT_SHOULDER:  i32 = 9;
-pub val GAMEPAD_BUTTON_RIGHT_SHOULDER: i32 = 10;
-pub val GAMEPAD_BUTTON_DPAD_UP:        i32 = 11;
-pub val GAMEPAD_BUTTON_DPAD_DOWN:      i32 = 12;
-pub val GAMEPAD_BUTTON_DPAD_LEFT:      i32 = 13;
-pub val GAMEPAD_BUTTON_DPAD_RIGHT:     i32 = 14;
-
-pub val GAMEPAD_AXIS_LEFTX:         i32 = 0;
-pub val GAMEPAD_AXIS_LEFTY:         i32 = 1;
-pub val GAMEPAD_AXIS_RIGHTX:        i32 = 2;
-pub val GAMEPAD_AXIS_RIGHTY:        i32 = 3;
-pub val GAMEPAD_AXIS_LEFT_TRIGGER:  i32 = 4;
-pub val GAMEPAD_AXIS_RIGHT_TRIGGER: i32 = 5;
-
 # --- SDL_rect.h ---
 
 # SDL_FRect: 4 f32 fields, no padding -- every offset already 4-aligned
@@ -278,7 +240,7 @@ pub rec FRect {
     h: f32;
 }
 
-test "sdl.c: FRect layout is 16 bytes" {
+test sdl_c_frect_layout_is_16_bytes {
     if ($size_of(FRect) != 16) { ret 1; }
     ret 0;
 }
@@ -325,7 +287,7 @@ pub rec AudioSpec {
     freq:     i32;
 }
 
-test "sdl.c: AudioSpec layout is 12 bytes" {
+test sdl_c_audiospec_layout_is_12_bytes {
     if ($size_of(AudioSpec) != 12) { ret 1; }
     ret 0;
 }
@@ -409,19 +371,6 @@ pub ext fun SDL_GetWindowSize(window: ptr, w: *i32, h: *i32) u8;
 pub ext fun SDL_SetWindowPosition(window: ptr, x: i32, y: i32) u8;
 pub ext fun SDL_SetWindowFullscreen(window: ptr, fullscreen: u8) u8;
 
-# --- gamepad rumble (SDL_gamepad.h) ---
-
-pub ext fun SDL_RumbleGamepad(gamepad: ptr, low_freq: u16, high_freq: u16, duration_ms: u32) u8;
-
-# --- gamepad name + trigger rumble (SDL_gamepad.h) ---
-#
-# SDL_GetGamepadName returns a pointer to an internal string (no copy
-# needed, no free needed). SDL_RumbleGamepadTriggers is only supported
-# on Xbox One gamepads; silently does nothing on other hardware.
-
-pub ext fun SDL_GetGamepadName(gamepad: ptr) *u8;
-pub ext fun SDL_RumbleGamepadTriggers(gamepad: ptr, left_rumble: u16, right_rumble: u16, duration_ms: u32) u8;
-
 # --- rect intersection (SDL_rect.h) ---
 #
 # SDL_PointInRectFloat is NOT bound -- it's SDL_FORCE_INLINE in the
@@ -489,7 +438,7 @@ pub rec Rect {
     h: i32;
 }
 
-test "sdl.c: Rect layout is 16 bytes" {
+test sdl_c_rect_layout_is_16_bytes {
     if ($size_of(Rect) != 16) { ret 1; }
     ret 0;
 }
@@ -511,7 +460,7 @@ pub rec FPoint {
     y: f32;
 }
 
-test "sdl.c: FPoint layout is 8 bytes" {
+test sdl_c_fpoint_layout_is_8_bytes {
     if ($size_of(FPoint) != 8) { ret 1; }
     ret 0;
 }
@@ -533,10 +482,7 @@ pub ext fun SDL_HasClipboardText() u8;
 
 # --- memory (SDL_stdinc.h) ---
 #
-# needed specifically to free SDL-owned heap allocations this binding
-# receives: the gamepad-ID array from SDL_GetGamepads (gamepad.mach's
-# open_first_gamepad -- previously a known leak, now fixed by calling
-# this) and the string from SDL_GetClipboardText (clipboard.mach's
+# needed to free the string from SDL_GetClipboardText (clipboard.mach's
 # free_text).
 
 pub ext fun SDL_free(mem: ptr);

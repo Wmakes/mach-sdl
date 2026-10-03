@@ -88,7 +88,7 @@ pub fun capture(enabled: bool) bool {
     ret c.SDL_CaptureMouse(flag) != 0;
 }
 
-test "mouse: get_relative_state does not crash under the dummy driver" {
+test mouse_get_relative_state_does_not_crash_under_the_dummy_driver {
     if (!core.use_dummy_video_driver()) { ret 1; }
     if (!core.init(core.INIT_VIDEO)) { ret 1; }
 

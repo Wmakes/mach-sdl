@@ -282,7 +282,7 @@ pub fun draw_texture_rotated(renderer: ptr, texture: ptr, dst_rect: c.FRect, ang
     ret c.SDL_RenderTextureRotated(renderer, texture, nil, ?dst_rect, angle, ?center, flip) != 0;
 }
 
-test "renderer: create/clear/present/destroy round-trip under the dummy driver" {
+test renderer_create_clear_present_destroy_round_trip_under_the_dummy_driver {
     if (!core.use_dummy_video_driver()) { ret 1; }
     if (!core.init(core.INIT_VIDEO)) { ret 1; }
 
@@ -315,7 +315,7 @@ test "renderer: create/clear/present/destroy round-trip under the dummy driver" 
     ret 0;
 }
 
-test "renderer: blend mode, clip rect, scale, and bulk draws round-trip under the dummy driver" {
+test renderer_blend_mode_clip_rect_scale_and_bulk_draws_round_trip_under_the_dummy_driver {
     if (!core.use_dummy_video_driver()) { ret 1; }
     if (!core.init(core.INIT_VIDEO)) { ret 1; }
 
@@ -366,7 +366,7 @@ test "renderer: blend mode, clip rect, scale, and bulk draws round-trip under th
     ret 0;
 }
 
-test "renderer: load_texture on a nonexistent file fails cleanly (no crash)" {
+test renderer_load_texture_on_a_nonexistent_file_fails_cleanly_no_crash {
     if (!core.use_dummy_video_driver()) { ret 1; }
     if (!core.init(core.INIT_VIDEO)) { ret 1; }
 
@@ -394,7 +394,7 @@ test "renderer: load_texture on a nonexistent file fails cleanly (no crash)" {
     ret 0;
 }
 
-test "renderer: texture blend mode, color/alpha mod, and scale mode round-trip" {
+test renderer_texture_blend_mode_color_alpha_mod_and_scale_mode_round_trip {
     if (!core.use_dummy_video_driver()) { ret 1; }
     if (!core.init(core.INIT_VIDEO)) { ret 1; }
 

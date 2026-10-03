@@ -3,6 +3,7 @@ id = "sdl"
 version = "0.1.0"
 src = "src"
 out = "out/{target.name}/{profile.name}"
+mach = ">=6.0"
 
 [target.linux-x86_64]
 isa = "x86_64"
@@ -20,34 +21,22 @@ os  = "darwin"
 abi = "sysv64"
 
 [profile.debug]
-opt   = 0
-debug = true
-simd  = "scalarize"
+opt            = 0
+debug          = true
+simd           = "scalarize"
+vectorize      = false
+float_reassoc  = false
+default        = true
 
 [profile.release]
-opt   = 2
-debug = false
-simd  = "scalarize"
+opt            = 2
+debug          = false
+simd           = "scalarize"
+vectorize      = false
+float_reassoc  = false
 
-# the library: entry is the surface module (sdl.mach), so building this
-# artifact pulls in and type-checks the whole public API, same as
-# mach-std's own [artifact.std] does with lib.mach. this is what other
-# projects vendor via [dep.mach-sdl] + `use sdl.x;` -- consumption is
-# still source-level, not against this compiled .a, but building it
-# standalone is a real end-to-end check that the whole module graph
-# links cleanly.
-[artifact.sdl]
-kind    = "static"
-entry   = "sdl.mach"
-out     = "lib/sdl"
-targets = ["*"]
-link    = ["sdl", "sdl-win"]
-need    = []
 
-# the demo/smoke-test binary. mach-glfw's own project has no static
-# artifact at all -- only this kind of bin demo -- so this is the piece
-# with the most direct precedent: a real window, real GL context, real
-# event loop, run by hand rather than under `mach test`.
+
 [artifact.demo]
 kind    = "bin"
 entry   = "main.mach"
@@ -72,6 +61,6 @@ isa    = "*"
 abi    = "*"
 export = true
 
-[dep.mach-std]
+[dep.std]
 git = "https://github.com/briar-systems/mach-std"
 ref = "branch/main"

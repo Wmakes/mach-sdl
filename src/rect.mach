@@ -31,7 +31,7 @@ pub fun point_in_rect(px: f32, py: f32, r: c.FRect) bool {
     ret px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h;
 }
 
-test "rect: intersects detects overlap and non-overlap" {
+test rect_intersects_detects_overlap_and_non_overlap {
     val a: c.FRect = c.FRect{ x: 0.0, y: 0.0, w: 10.0, h: 10.0 };
     val b: c.FRect = c.FRect{ x: 5.0, y: 5.0, w: 10.0, h: 10.0 };
     val c_: c.FRect = c.FRect{ x: 100.0, y: 100.0, w: 10.0, h: 10.0 };
@@ -41,7 +41,7 @@ test "rect: intersects detects overlap and non-overlap" {
     ret 0;
 }
 
-test "rect: point_in_rect is inclusive on the near edge, exclusive on the far edge" {
+test rect_point_in_rect_is_inclusive_on_the_near_edge_exclusive_on_the_far_edge {
     val r: c.FRect = c.FRect{ x: 0.0, y: 0.0, w: 10.0, h: 10.0 };
 
     if (!point_in_rect(0.0, 0.0, r)) { ret 1; }   # near corner: inside

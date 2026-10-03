@@ -55,7 +55,7 @@ pub fun tick(clock: *Clock) f64 {
     ret elapsed;
 }
 
-test "timer: a fresh clock's first tick is not negative or absurd" {
+test timer_a_fresh_clock_s_first_tick_is_not_negative_or_absurd {
     var clk: Clock = new_clock();
     delay(5);
     val dt: f64 = tick(?clk);
@@ -64,7 +64,7 @@ test "timer: a fresh clock's first tick is not negative or absurd" {
     ret 0;
 }
 
-test "timer: ticks_ms is non-decreasing across a short delay" {
+test timer_ticks_ms_is_non_decreasing_across_a_short_delay {
     val before: u64 = ticks_ms();
     delay(2);
     val after: u64 = ticks_ms();

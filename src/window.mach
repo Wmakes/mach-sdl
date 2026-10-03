@@ -7,8 +7,6 @@
 use sdl.c;
 use sdl.core;
 use std.types.bool.bool;
-use std.types.bool.true;
-use std.types.bool.false;
 use std.types.string.str;
 
 
@@ -122,7 +120,7 @@ pub fun set_maximum_size(window: Window, w: i32, h: i32) bool {
     ret c.SDL_SetWindowMaximumSize(window.handle, w, h) != 0;
 }
 
-test "window: create_window/destroy_window round-trip under the dummy driver" {
+test window_create_window_destroy_window_round_trip_under_the_dummy_driver {
     if (!core.use_dummy_video_driver()) { ret 1; }
     if (!core.init(core.INIT_VIDEO)) { ret 1; }
 
@@ -139,7 +137,7 @@ test "window: create_window/destroy_window round-trip under the dummy driver" {
     ret 0;
 }
 
-test "window: a nil-handle Window reports invalid" {
+test window_a_nil_handle_window_reports_invalid {
     val w: Window = Window{ handle: nil };
     if (window_is_valid(w)) { ret 1; }
     ret 0;

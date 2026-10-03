@@ -10,14 +10,13 @@
 #             draw_texture (on a procedurally-created BMP at runtime
 #             since we can't ship a BMP here -- shows the failure path
 #             instead of skipping the code entirely)
-#   events    keyboard (WASD/F/R/ESC), mouse motion + click, window resize,
+#   events    keyboard (WASD/F/ESC), mouse motion + click, window resize,
 #             wheel
-#   key       full scancode table used: WASD, F (fullscreen), R (rumble),
+#   key       full scancode table used: WASD, F (fullscreen),
 #             SPACE (beep), ESC
 #   mouse     get_state (cursor pos poll each frame), hide/show cursor
 #             (toggle on M key)
 #   timer     Clock/tick driving delta-time movement
-#   gamepad   open_first_gamepad, button/axis_normalized poll, rumble
 #   audio     open_playback_stream, square-wave beep on SPACE
 #   rect      intersects/point_in_rect live per-frame (a collectible square
 #             that respawns when you touch it, proving collision works)
@@ -199,25 +198,12 @@ fun main(argc: i64, argv: **u8) i64 {
     var beep: [2400]u8;
     fill_beep(?beep[0]);
 
-    # --- gamepad ---
-    var have_gamepad: bool = false;
-    var gp: sdl.Gamepad;
-    if (sdl.has_gamepad()) {
-        gp = sdl.open_first_gamepad();
-        if (sdl.gamepad_is_valid(gp)) {
-            have_gamepad = true;
-            print.println("gamepad: connected");
-        }
-    } or {
-        print.println("gamepad: none connected");
-    }
-
     # --- collectible (rect + rand) ---
     var collectible: sdl.FRect = spawn_collectible(win_w, win_h);
     var score: i64 = 0;
 
     print.println("");
-    print.println("WASD=move  SPACE=beep  M=cursor  F=fullscreen  R=rumble  ESC=quit");
+    print.println("WASD=move  SPACE=beep  M=cursor  F=fullscreen  ESC=quit");
     print.println("L=relative mouse  N=minimize renderer window  C=copy clipboard  V=paste clipboard");
     print.println("collect the green square to score a point");
     print.println("");
@@ -268,14 +254,6 @@ fun main(argc: i64, argv: **u8) i64 {
                         sdl.hide_cursor();
                         cursor_hidden = true;
                         print.println("cursor: hidden");
-                    }
-                }
-                or (kb.scancode == sdl.R && sdl.key_is_fresh_press(kb)) {
-                    if (have_gamepad) {
-                        sdl.rumble(gp, 40000, 20000, 300);
-                        print.println("gamepad: rumble!");
-                    } or {
-                        print.println("R pressed but no gamepad to rumble");
                     }
                 }
                 or (kb.scancode == sdl.SPACE && sdl.key_is_fresh_press(kb)) {
@@ -355,14 +333,6 @@ fun main(argc: i64, argv: **u8) i64 {
         if (px > win_w - HALF) { px = win_w - HALF; }
         if (py > win_h - HALF) { py = win_h - HALF; }
 
-        # gamepad also controls movement
-        if (have_gamepad) {
-            val lx: f32 = sdl.axis_normalized(gp, sdl.AXIS_LEFTX);
-            val ly: f32 = sdl.axis_normalized(gp, sdl.AXIS_LEFTY);
-            px = px + lx * MOVE_SPEED * (dt::f32);
-            py = py + ly * MOVE_SPEED * (dt::f32);
-        }
-
         # poll mouse position
         var mx: f32 = 0.0;
         var my: f32 = 0.0;
@@ -374,9 +344,6 @@ fun main(argc: i64, argv: **u8) i64 {
             score = score + 1;
             print.printf("collected! score: {}\n", score);
             collectible = spawn_collectible(win_w, win_h);
-            if (have_gamepad) {
-                sdl.rumble(gp, 30000, 60000, 150);
-            }
         }
 
         print_accum = print_accum + dt;
@@ -490,7 +457,6 @@ fun main(argc: i64, argv: **u8) i64 {
     sdl.info("mach-sdl demo", "clean shutdown. all modules exercised.", nil_win);
 
     if (relative_mode) { sdl.set_relative_mode(w.handle, false); }
-    if (have_gamepad) { sdl.close_gamepad(gp); }
     if (have_audio)   { sdl.destroy(beep_stream); }
     sdl.destroy_renderer(rend);
     sdl.destroy_window(w2);

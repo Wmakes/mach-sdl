@@ -15,7 +15,6 @@ use sdl.key;
 use sdl.gl;
 use sdl.mouse;
 use sdl.timer;
-use sdl.gamepad;
 use sdl.renderer;
 use sdl.audio;
 use sdl.rect;
@@ -131,29 +130,6 @@ fwd timer.delay;
 fwd timer.Clock;
 fwd timer.new_clock;
 fwd timer.tick;
-
-# --- gamepad ---
-fwd gamepad.Gamepad;
-fwd gamepad.BUTTON_SOUTH; fwd gamepad.BUTTON_EAST;
-fwd gamepad.BUTTON_WEST; fwd gamepad.BUTTON_NORTH;
-fwd gamepad.BUTTON_BACK; fwd gamepad.BUTTON_GUIDE; fwd gamepad.BUTTON_START;
-fwd gamepad.BUTTON_LEFT_STICK; fwd gamepad.BUTTON_RIGHT_STICK;
-fwd gamepad.BUTTON_LEFT_SHOULDER; fwd gamepad.BUTTON_RIGHT_SHOULDER;
-fwd gamepad.BUTTON_DPAD_UP; fwd gamepad.BUTTON_DPAD_DOWN;
-fwd gamepad.BUTTON_DPAD_LEFT; fwd gamepad.BUTTON_DPAD_RIGHT;
-fwd gamepad.AXIS_LEFTX; fwd gamepad.AXIS_LEFTY;
-fwd gamepad.AXIS_RIGHTX; fwd gamepad.AXIS_RIGHTY;
-fwd gamepad.AXIS_LEFT_TRIGGER; fwd gamepad.AXIS_RIGHT_TRIGGER;
-fwd gamepad.has_gamepad;
-fwd gamepad.gamepad_is_valid;
-fwd gamepad.open_first_gamepad;
-fwd gamepad.close_gamepad;
-fwd gamepad.button;
-fwd gamepad.axis;
-fwd gamepad.axis_normalized;
-fwd gamepad.rumble;
-fwd gamepad.gamepad_name;
-fwd gamepad.rumble_triggers;
 
 # --- renderer + textures ---
 fwd renderer.create_renderer;

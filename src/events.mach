@@ -118,7 +118,7 @@ pub fun key_is_fresh_press(key: c.KeyboardEvent) bool {
     ret key.down != 0 && key.repeat == 0;
 }
 
-test "events: key_is_fresh_press distinguishes press, repeat, and release" {
+test events_key_is_fresh_press_distinguishes_press_repeat_and_release {
     # pure logic, no SDL call involved -- constructing the struct by hand
     var fresh: c.KeyboardEvent;
     fresh.down   = 1;
@@ -138,7 +138,7 @@ test "events: key_is_fresh_press distinguishes press, repeat, and release" {
     ret 0;
 }
 
-test "events: poll_event drains without crashing under the dummy driver" {
+test events_poll_event_drains_without_crashing_under_the_dummy_driver {
     if (!core.use_dummy_video_driver()) { ret 1; }
     if (!core.init(core.INIT_VIDEO)) { ret 1; }
 
