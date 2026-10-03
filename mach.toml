@@ -40,22 +40,24 @@ float_reassoc  = false
 [artifact.demo]
 kind    = "bin"
 entry   = "main.mach"
-out     = "bin/demo"
+out     = "bin/demo{artifact.suffix}"
 targets = ["*"]
 link    = ["sdl", "sdl-win"]
 need    = []
 
 [link.sdl]
-source = "system"
-name   = "SDL3"
+source  = "system"
+name    = "SDL3"
+library = "sdl"
 os     = ["linux", "darwin"]
 isa    = "*"
 abi    = "*"
 export = true
 
 [link.sdl-win]
-source = "system"
-name   = "SDL3.dll"
+source  = "system"
+name    = "SDL3.dll"
+library = "sdl"
 os     = ["windows"]
 isa    = "*"
 abi    = "*"
