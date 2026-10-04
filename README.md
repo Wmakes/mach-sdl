@@ -20,6 +20,8 @@ ref = "branch/master"
 
 Then import the modules you need, e.g. `use sdl.window;`.
 
+Documentation is accessible via `mach doc`.
+
 ## Status
 
 `mach-sdl` is still a work in progress and does **not yet implement the entirety of SDL3**. Some APIs and functionality may be missing or incomplete.
