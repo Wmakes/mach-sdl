@@ -3,7 +3,8 @@
 # a Stream is a by-value handle around an SDL_AudioStream bound to the
 # default playback device (or one picked from the device list). push raw
 # samples into it with put and start it with resume (streams begin paused).
-# no callbacks and no capture; this covers "play a sound", not a mixer.
+# no callbacks and no capture; this covers "play a sound", not full audio mixing.
+# for a mixer with load, looping, fades and spatial audio, see sdl.mixer.
 # loading a WAV file into a stream lives in sdl.wav.
 #
 # every fallible function checks its handle first and returns

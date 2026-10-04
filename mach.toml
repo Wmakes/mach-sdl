@@ -1,6 +1,6 @@
 [project]
 id = "sdl"
-version = "0.8.0"
+version = "0.9.0"
 src = "src"
 out = "out/{target.name}/{profile.name}"
 mach = ">=6.0"
@@ -42,7 +42,7 @@ kind    = "bin"
 entry   = "main.mach"
 out     = "bin/demo{artifact.suffix}"
 targets = ["*"]
-link    = ["sdl", "sdl-win", "sdl-ttf", "sdl-ttf-win", "sdl-image", "sdl-image-win"]
+link    = ["sdl", "sdl-win", "sdl-ttf", "sdl-ttf-win", "sdl-image", "sdl-image-win", "sdl-mixer", "sdl-mixer-win"]
 need    = []
 
 [link.sdl]
@@ -94,6 +94,24 @@ export  = true
 source  = "system"
 name    = "SDL3_image.dll"
 library = "sdl-image"
+os      = ["windows"]
+isa     = "*"
+abi     = "*"
+export  = true
+
+[link.sdl-mixer]
+source  = "system"
+name    = "SDL3_mixer"
+library = "sdl-mixer"
+os      = ["linux", "darwin"]
+isa     = "*"
+abi     = "*"
+export  = true
+
+[link.sdl-mixer-win]
+source  = "system"
+name    = "SDL3_mixer.dll"
+library = "sdl-mixer"
 os      = ["windows"]
 isa     = "*"
 abi     = "*"

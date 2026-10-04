@@ -12,7 +12,8 @@
 #              set_clip, draw_points, draw_lines, fill_rects in the second
 #              window; texture.load on a missing file shows the failure path
 #   event      poll() into the typed Event tag: keys, mouse, wheel, resize
-#   key        scancode constants: WASD, F, M, L, N, C, V, P, SPACE, ESC
+#   key        scancode constants: WASD, F, M, L, N, C, V, P, SPACE, ESC,
+#              B, Q, R, T, G, H, J
 #   mouse      state() each frame, show / hide cursor (M), relative mode (L)
 #   timer      Clock / tick drives delta-time movement
 #   audio      open + put + resume: a square-wave beep on SPACE
@@ -32,10 +33,16 @@
 #              one frame); P takes a screenshot: renderer.read_pixels,
 #              save_png, save_jpg, then detect / load / load_texture them
 #              back and show the PNG as a thumbnail
+#   mixer      version, decoder list, expected failure (load nonexistent
+#              file), a 440 Hz sine wave tone at startup; with an audio
+#              argument: load, play on a track with interactive controls
 #
 # controls: WASD move, SPACE beep, M cursor, F fullscreen, L relative mouse,
 # N minimize / restore the renderer window, C copy, V paste, P screenshot,
 # ESC quit.
+# mixer controls (only with an audio file argument): B=play/stop,
+# Q=pause/resume, R=loop toggle, T=volume up, G=volume down, H=pan left,
+# J=pan right.
 #
 # font: pass a .ttf path as the first argument, otherwise a few common system
 # fonts are tried. with no usable font the demo runs without text.
@@ -44,6 +51,10 @@
 # argument. to give an image but use a system font, pass "-" as the font. the
 # screenshot is written to mach-sdl-shot.png and mach-sdl-shot.jpg in the
 # current directory.
+#
+# sound: pass an audio file (OGG, MP3, WAV, FLAC, ...) as the third argument
+# for interactive playback. pass "-" to skip. a 440 Hz sine wave plays at
+# startup regardless (if the mixer opens successfully).
 
 use std.runtime;
 use print: std.print;
@@ -66,6 +77,7 @@ use sdl.font;
 use sdl.gl;
 use sdl.image;
 use sdl.key;
+use sdl.mixer;
 use sdl.mouse;
 use sdl.msgbox;
 use sdl.rand;
@@ -490,6 +502,98 @@ fun main(argc: i64, argv: **u8) i64 {
         print.eprintln(error.message());
     }
 
+    # --- audio mixing (SDL3_mixer) ---
+    var have_mixer: bool = false;
+    var mix_dev:    mixer.Mixer = mixer.Mixer{ handle: nil };
+    var mix_audio:  mixer.Audio = mixer.Audio{ handle: nil };
+    var mix_track:  mixer.Track = mixer.Track{ handle: nil };
+    var mix_looping: bool = false;
+    var mix_gain:   f32 = 1.0;
+    var mix_pan:    f32 = 0.0;
+
+    val mix_started: err[error.Error] = mixer.init();
+    if (sel mix_started.ok) {
+        have_mixer = true;
+        print.printf("SDL3_mixer version: {}\n", mixer.version());
+
+        val num_dec: i32 = mixer.decoder_count();
+        print.printf("SDL3_mixer decoders ({}):", num_dec);
+        var di: i32 = 0;
+        for (di < num_dec) {
+            val dn: res[str, error.Error] = mixer.decoder_name(di);
+            if (sel dn.ok) {
+                print.eprint(" ");
+                print.eprint(dn.ok);
+            }
+            di = di + 1;
+        }
+        print.println("");
+
+        # open the default playback device. 0xFFFFFFFF is SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK
+        val made_dev: res[mixer.Mixer, error.Error] = mixer.create_device(0xFFFFFFFF::u32);
+        if (sel made_dev.ok) {
+            mix_dev = made_dev.ok;
+        } or {
+            print.eprint("mixer.create_device failed: ");
+            print.eprintln(error.message());
+        }
+
+        if (mixer.is_mixer_valid(mix_dev)) {
+            # no such file, so this must fail cleanly
+            val bad_mix: res[mixer.Audio, error.Error] = mixer.load_audio(mix_dev, "nonexistent.ogg", false);
+            if (sel bad_mix.err) {
+                print.println("mixer load (expected failure): ok, no crash, error reported cleanly");
+            }
+            if (sel bad_mix.ok) {
+                mixer.destroy_audio(bad_mix.ok);
+            }
+
+            # a file-free 440 Hz sine wave plays for 500 ms at startup
+            val sine: res[mixer.Audio, error.Error] = mixer.create_sine(mix_dev, 440, 0.3, 500);
+            if (sel sine.ok) {
+                mixer.play_audio(mix_dev, sine.ok);
+                mixer.destroy_audio(sine.ok);
+                print.println("mixer: played a 440 Hz sine wave tone");
+            } or {
+                print.eprint("mixer: create_sine failed: ");
+                print.eprintln(error.message());
+            }
+
+            # load audio from argument 3 if provided (not "-")
+            if (argc > 3) {
+                if (argv[3][0] != 45) {
+                    val loaded_mix: res[mixer.Audio, error.Error] = mixer.load_audio(mix_dev, argv[3], false);
+                    if (sel loaded_mix.ok) {
+                        mix_audio = loaded_mix.ok;
+                        val track_res: res[mixer.Track, error.Error] = mixer.create_track(mix_dev);
+                        if (sel track_res.ok) {
+                            mix_track = track_res.ok;
+                            mixer.set_track_audio(mix_track, mix_audio);
+                            val play_r: err[error.Error] = mixer.play_track(mix_track, mixer.default_options());
+                            if (sel play_r.ok) {
+                                print.println("mixer: audio loaded and playing");
+                            } or {
+                                print.eprint("mixer: play failed: ");
+                                print.eprintln(error.message());
+                            }
+                        } or {
+                            print.eprint("mixer: create_track failed: ");
+                            print.eprintln(error.message());
+                        }
+                    } or {
+                        print.eprint("mixer: load failed: ");
+                        print.eprintln(error.message());
+                    }
+                }
+            } or {
+                print.println("(pass an audio file as the third argument)");
+            }
+        }
+    } or {
+        print.eprint("mixer.init failed: ");
+        print.eprintln(error.message());
+    }
+
     # --- collectible (rect + rand) ---
     var collectible: rect.FRect = spawn_collectible(win_w, win_h);
     var score: i64 = 0;
@@ -498,6 +602,9 @@ fun main(argc: i64, argv: **u8) i64 {
     print.println("WASD=move  SPACE=beep  M=cursor  F=fullscreen  ESC=quit");
     print.println("L=relative mouse  N=minimize renderer window  C=copy clipboard  V=paste clipboard");
     print.println("P=screenshot of the renderer window (mach-sdl-shot.png / .jpg)");
+    if (mixer.is_track_valid(mix_track)) {
+        print.println("B=play/stop  Q=pause/resume  R=loop  T/G=vol up/down  H/J=pan left/right");
+    }
     print.println("collect the green square to score a point");
     print.println("");
 
@@ -591,6 +698,75 @@ fun main(argc: i64, argv: **u8) i64 {
                         clipboard.free_text(pasted.ok);
                     } or {
                         print.println("clipboard: could not read text");
+                    }
+                }
+                or (kd.scancode == key.B && fresh) {
+                    if (mixer.is_track_valid(mix_track)) {
+                        if (mixer.is_playing(mix_track)) {
+                            mixer.stop_track(mix_track, 0);
+                            print.println("mixer: stopped");
+                        } or {
+                            val pr: err[error.Error] = mixer.play_track(mix_track, mixer.default_options());
+                            if (sel pr.ok) {
+                                print.println("mixer: playing");
+                            }
+                        }
+                    }
+                }
+                or (kd.scancode == key.Q && fresh) {
+                    if (mixer.is_track_valid(mix_track)) {
+                        if (mixer.is_paused(mix_track)) {
+                            mixer.resume_track(mix_track);
+                            print.println("mixer: resumed");
+                        } or {
+                            mixer.pause_track(mix_track);
+                            print.println("mixer: paused");
+                        }
+                    }
+                }
+                or (kd.scancode == key.R && fresh) {
+                    if (mixer.is_track_valid(mix_track)) {
+                        if (mix_looping) {
+                            mixer.set_track_loops(mix_track, 0);
+                            mix_looping = false;
+                            print.println("mixer: loop off (plays once)");
+                        } or {
+                            mixer.set_track_loops(mix_track, 0 - 1);
+                            mix_looping = true;
+                            print.println("mixer: loop forever");
+                        }
+                    }
+                }
+                or (kd.scancode == key.T && fresh) {
+                    if (mixer.is_mixer_valid(mix_dev)) {
+                        mix_gain = mix_gain + 0.1;
+                        if (mix_gain > 2.0) { mix_gain = 2.0; }
+                        mixer.set_mixer_gain(mix_dev, mix_gain);
+                        print.printf("mixer: gain {}/10\n", (mix_gain * 10.0)::i32);
+                    }
+                }
+                or (kd.scancode == key.G && fresh) {
+                    if (mixer.is_mixer_valid(mix_dev)) {
+                        mix_gain = mix_gain - 0.1;
+                        if (mix_gain < 0.0) { mix_gain = 0.0; }
+                        mixer.set_mixer_gain(mix_dev, mix_gain);
+                        print.printf("mixer: gain {}/10\n", (mix_gain * 10.0)::i32);
+                    }
+                }
+                or (kd.scancode == key.H && fresh) {
+                    if (mixer.is_track_valid(mix_track)) {
+                        mix_pan = mix_pan - 0.2;
+                        if (mix_pan < (0.0 - 1.0)) { mix_pan = 0.0 - 1.0; }
+                        mixer.set_track_pan(mix_track, mix_pan);
+                        print.printf("mixer: pan {}/10\n", (mix_pan * 10.0)::i32);
+                    }
+                }
+                or (kd.scancode == key.J && fresh) {
+                    if (mixer.is_track_valid(mix_track)) {
+                        mix_pan = mix_pan + 0.2;
+                        if (mix_pan > 1.0) { mix_pan = 1.0; }
+                        mixer.set_track_pan(mix_track, mix_pan);
+                        print.printf("mixer: pan {}/10\n", (mix_pan * 10.0)::i32);
                     }
                 }
             }
@@ -825,6 +1001,10 @@ fun main(argc: i64, argv: **u8) i64 {
 
     if (relative_mode) { mouse.set_relative(main_win, false); }
     if (have_audio)    { audio.close(beep_stream); }
+    if (mixer.is_track_valid(mix_track)) { mixer.destroy_track(mix_track); }
+    if (mixer.is_audio_valid(mix_audio)) { mixer.destroy_audio(mix_audio); }
+    if (mixer.is_mixer_valid(mix_dev))   { mixer.destroy(mix_dev); }
+    if (have_mixer)                       { mixer.quit(); }
     texture.destroy(score_tex);
     texture.destroy(help_tex);
     texture.destroy(anim_tex);

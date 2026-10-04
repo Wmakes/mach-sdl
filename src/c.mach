@@ -5,16 +5,18 @@
 # (SDL_init.h, SDL_error.h, SDL_video.h, SDL_events.h, SDL_mouse.h,
 # SDL_keyboard.h, SDL_timer.h, SDL_rect.h, SDL_render.h, SDL_surface.h,
 # SDL_audio.h, SDL_clipboard.h, SDL_messagebox.h, SDL_blendmode.h,
-# SDL_stdinc.h, plus the SDL_iostream.h / SDL_filesystem.h glue SDL_image
-# needs at the end of this file). SDL3's `bool` is a real
+# SDL_stdinc.h, SDL_iostream.h / SDL_filesystem.h (SDL_image glue),
+# SDL_properties.h (SDL_mixer glue)). SDL3's `bool` is a real
 # C99 _Bool (1 byte), so every SDL bool-returning function is declared `u8`
 # here and unwrapped with `!= 0` in the idiomatic wrapper modules, the same
 # way mach-glfw unwraps GLFW's int-based booleans in its own core.mach.
 #
 # scope: init/quit, hints, window, GL context, events, keyboard, mouse,
 # text input, timing, rects, random numbers, the 2D renderer and textures,
-# clipboard, message boxes, audio (playback, device list, WAV). not bound:
-# gamepad, joystick, haptics, camera, sensors.
+# clipboard, message boxes, audio (playback, device list, WAV),
+# SDL_IOStream / SDL_RemovePath (SDL_image glue),
+# SDL_Properties (SDL_mixer glue). not bound: gamepad, joystick, haptics,
+# camera, sensors.
 
 use std.types.size.usize;
 
@@ -638,3 +640,22 @@ pub ext fun SDL_CloseIO(context: ptr) u8;
 pub ext fun SDL_RenderReadPixels(renderer: ptr, rect: *Rect) ptr;
 #[library("sdl")]
 pub ext fun SDL_RemovePath(path: *u8) u8;
+
+# --- glue for SDL_mixer (SDL_properties.h) ---
+#
+# SDL_mixer's MIX_PlayTrack and MIX_PlayTag accept play options as an
+# SDL_PropertiesID. these five functions cover the full lifecycle: create an
+# empty property bag, fill it, use it, destroy it. SDL_PropertiesID is a
+# typedef Uint32; 0 is the invalid ID (SDL_CreateProperties returns 0 on
+# failure). signatures verified against SDL_properties.h at release-3.2.0.
+
+#[library("sdl")]
+pub ext fun SDL_CreateProperties() u32;
+#[library("sdl")]
+pub ext fun SDL_SetNumberProperty(props: u32, name: *u8, value: i64) u8;
+#[library("sdl")]
+pub ext fun SDL_SetBooleanProperty(props: u32, name: *u8, value: u8) u8;
+#[library("sdl")]
+pub ext fun SDL_SetFloatProperty(props: u32, name: *u8, value: f32) u8;
+#[library("sdl")]
+pub ext fun SDL_DestroyProperties(props: u32);

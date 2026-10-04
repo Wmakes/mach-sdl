@@ -1,0 +1,371 @@
+# raw C-ABI imports of SDL3_mixer 3.2
+#
+# every function is a pub ext fun with its C name and C-faithful types,
+# transcribed from SDL3_mixer's SDL_mixer.h (release-3.2.4). it lives apart
+# from sdl.c because SDL3_mixer is a separate shared library (libSDL3_mixer)
+# with its own link entry in mach.toml, bound as library "sdl-mixer".
+#
+# conventions match sdl.c: SDL's `bool` is a 1-byte C99 _Bool, so every
+# bool-returning or bool-taking function is declared u8. opaque handles
+# (MIX_Mixer *, MIX_Audio *, MIX_Track *, MIX_Group *, MIX_AudioDecoder *,
+# SDL_AudioStream *, SDL_IOStream *) are held as ptr. `const char *` is *u8.
+# `size_t` is usize. `int` is i32. `Sint64` is i64. `float` is f32.
+# SDL_PropertiesID and SDL_AudioDeviceID are u32.
+#
+# MIX_StereoGains and MIX_Point3D are the only concrete structs. both are
+# only ever passed by pointer, never by value across an ext fun boundary.
+# layout tests verify the sizes the C compiler produces.
+#
+# callbacks (MIX_TrackStoppedCallback, MIX_TrackMixCallback,
+# MIX_GroupMixCallback, MIX_PostMixCallback): the parameter is typed ptr
+# because no function in this project uses callback-driven mixing; sdl.mixer
+# always passes nil for these. the same rationale applies to
+# SDL_OpenAudioDeviceStream's callback parameter in sdl.c.
+#
+# function count: 94. a regex that matches any identifier starting with
+# `MIX_` also catches 5 type names in the header (MIX_Mixer, MIX_Audio,
+# MIX_Track, MIX_Group, MIX_AudioDecoder), giving a naive count of 99.
+#
+# version compatibility: 3.2.0, 3.2.2 and 3.2.4 export the identical 94
+# functions. PROP_PLAY_START_ORDER_NUMBER was added in 3.2.2 and
+# PROP_AUDIO_LOAD_IGNORE_LOOPS_BOOLEAN in 3.2.4; an unknown property name
+# is silently ignored by SDL, so both constants are safe to pass to any
+# 3.2.x library. the installed version at binding time is 3.2.4.
+
+use sdl.c;
+use std.types.size.usize;
+use std.types.string.str;
+
+# MIX_StereoGains, transcribed field-for-field from SDL_mixer.h. two f32
+# fields (left, right): 4+4 = 8 bytes, no padding.
+pub rec StereoGains {
+    left:  f32;
+    right: f32;
+}
+
+test mix__stereogains_layout_is_8_bytes {
+    if ($size_of(StereoGains) != 8) { ret 1; }
+    ret 0;
+}
+
+# MIX_Point3D, transcribed field-for-field from SDL_mixer.h. three f32
+# fields (x, y, z): 4+4+4 = 12 bytes, no padding.
+pub rec Point3D {
+    x: f32;
+    y: f32;
+    z: f32;
+}
+
+test mix__point3d_layout_is_12_bytes {
+    if ($size_of(Point3D) != 12) { ret 1; }
+    ret 0;
+}
+
+# --- property name strings ---
+#
+# passed to SDL_SetNumberProperty / SDL_SetBooleanProperty /
+# SDL_SetFloatProperty via sdl.c. values verified against SDL_mixer.h
+# release-3.2.4.
+
+# mixer properties
+pub val PROP_MIXER_DEVICE_NUMBER: str = "SDL_mixer.mixer.device";
+
+# audio load properties (for MIX_LoadAudioWithProperties)
+pub val PROP_AUDIO_LOAD_IOSTREAM_POINTER:          str = "SDL_mixer.audio.load.iostream";
+pub val PROP_AUDIO_LOAD_CLOSEIO_BOOLEAN:           str = "SDL_mixer.audio.load.closeio";
+pub val PROP_AUDIO_LOAD_PREDECODE_BOOLEAN:         str = "SDL_mixer.audio.load.predecode";
+pub val PROP_AUDIO_LOAD_PREFERRED_MIXER_POINTER:   str = "SDL_mixer.audio.load.preferred_mixer";
+pub val PROP_AUDIO_LOAD_SKIP_METADATA_TAGS_BOOLEAN: str = "SDL_mixer.audio.load.skip_metadata_tags";
+pub val PROP_AUDIO_LOAD_IGNORE_LOOPS_BOOLEAN:      str = "SDL_mixer.audio.load.ignore_loops";
+pub val PROP_AUDIO_DECODER_STRING:                 str = "SDL_mixer.audio.decoder";
+
+# audio metadata properties (read from MIX_GetAudioProperties after load)
+pub val PROP_METADATA_TITLE_STRING:            str = "SDL_mixer.metadata.title";
+pub val PROP_METADATA_ARTIST_STRING:           str = "SDL_mixer.metadata.artist";
+pub val PROP_METADATA_ALBUM_STRING:            str = "SDL_mixer.metadata.album";
+pub val PROP_METADATA_COPYRIGHT_STRING:        str = "SDL_mixer.metadata.copyright";
+pub val PROP_METADATA_TRACK_NUMBER:            str = "SDL_mixer.metadata.track";
+pub val PROP_METADATA_TOTAL_TRACKS_NUMBER:     str = "SDL_mixer.metadata.total_tracks";
+pub val PROP_METADATA_YEAR_NUMBER:             str = "SDL_mixer.metadata.year";
+pub val PROP_METADATA_DURATION_FRAMES_NUMBER:  str = "SDL_mixer.metadata.duration_frames";
+pub val PROP_METADATA_DURATION_INFINITE_BOOLEAN: str = "SDL_mixer.metadata.duration_infinite";
+
+# play options (passed to MIX_PlayTrack / MIX_PlayTag via SDL_CreateProperties)
+pub val PROP_PLAY_LOOPS_NUMBER:                     str = "SDL_mixer.play.loops";
+pub val PROP_PLAY_MAX_FRAME_NUMBER:                 str = "SDL_mixer.play.max_frame";
+pub val PROP_PLAY_MAX_MILLISECONDS_NUMBER:          str = "SDL_mixer.play.max_milliseconds";
+pub val PROP_PLAY_START_FRAME_NUMBER:               str = "SDL_mixer.play.start_frame";
+pub val PROP_PLAY_START_MILLISECOND_NUMBER:         str = "SDL_mixer.play.start_millisecond";
+pub val PROP_PLAY_START_ORDER_NUMBER:               str = "SDL_mixer.play.start_order";
+pub val PROP_PLAY_LOOP_START_FRAME_NUMBER:          str = "SDL_mixer.play.loop_start_frame";
+pub val PROP_PLAY_LOOP_START_MILLISECOND_NUMBER:    str = "SDL_mixer.play.loop_start_millisecond";
+pub val PROP_PLAY_FADE_IN_FRAMES_NUMBER:            str = "SDL_mixer.play.fade_in_frames";
+pub val PROP_PLAY_FADE_IN_MILLISECONDS_NUMBER:      str = "SDL_mixer.play.fade_in_milliseconds";
+pub val PROP_PLAY_FADE_IN_START_GAIN_FLOAT:         str = "SDL_mixer.play.fade_in_start_gain";
+pub val PROP_PLAY_APPEND_SILENCE_FRAMES_NUMBER:     str = "SDL_mixer.play.append_silence_frames";
+pub val PROP_PLAY_APPEND_SILENCE_MILLISECONDS_NUMBER: str = "SDL_mixer.play.append_silence_milliseconds";
+pub val PROP_PLAY_HALT_WHEN_EXHAUSTED_BOOLEAN:      str = "SDL_mixer.play.halt_when_exhausted";
+
+# --- version and lifecycle ---
+
+#[library("sdl-mixer")]
+pub ext fun MIX_Version() i32;
+#[library("sdl-mixer")]
+pub ext fun MIX_Init() u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_Quit();
+
+# --- decoder enumeration ---
+
+#[library("sdl-mixer")]
+pub ext fun MIX_GetNumAudioDecoders() i32;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetAudioDecoder(index: i32) *u8;
+
+# --- mixer lifecycle ---
+
+#[library("sdl-mixer")]
+pub ext fun MIX_CreateMixerDevice(devid: u32, spec: *c.AudioSpec) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_CreateMixer(spec: *c.AudioSpec) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_DestroyMixer(mixer: ptr);
+#[library("sdl-mixer")]
+pub ext fun MIX_GetMixerProperties(mixer: ptr) u32;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetMixerFormat(mixer: ptr, spec: *c.AudioSpec) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_LockMixer(mixer: ptr);
+#[library("sdl-mixer")]
+pub ext fun MIX_UnlockMixer(mixer: ptr);
+
+# --- audio loading ---
+
+#[library("sdl-mixer")]
+pub ext fun MIX_LoadAudio_IO(mixer: ptr, io: ptr, predecode: u8, closeio: u8) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_LoadAudio(mixer: ptr, path: *u8, predecode: u8) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_LoadAudioNoCopy(mixer: ptr, data: ptr, datalen: usize, free_when_done: u8) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_LoadAudioWithProperties(props: u32) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_LoadRawAudio_IO(mixer: ptr, io: ptr, spec: *c.AudioSpec, closeio: u8) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_LoadRawAudio(mixer: ptr, data: ptr, datalen: usize, spec: *c.AudioSpec) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_LoadRawAudioNoCopy(mixer: ptr, data: ptr, datalen: usize, spec: *c.AudioSpec, free_when_done: u8) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_CreateSineWaveAudio(mixer: ptr, hz: i32, amplitude: f32, ms: i64) ptr;
+
+# --- audio queries ---
+
+#[library("sdl-mixer")]
+pub ext fun MIX_GetAudioProperties(audio: ptr) u32;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetAudioDuration(audio: ptr) i64;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetAudioFormat(audio: ptr, spec: *c.AudioSpec) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_DestroyAudio(audio: ptr);
+
+# --- track lifecycle ---
+
+#[library("sdl-mixer")]
+pub ext fun MIX_CreateTrack(mixer: ptr) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_DestroyTrack(track: ptr);
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackProperties(track: ptr) u32;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackMixer(track: ptr) ptr;
+
+# --- track input ---
+
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackAudio(track: ptr, audio: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackAudioStream(track: ptr, stream: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackIOStream(track: ptr, io: ptr, closeio: u8) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackRawIOStream(track: ptr, io: ptr, spec: *c.AudioSpec, closeio: u8) u8;
+
+# --- track tags ---
+
+#[library("sdl-mixer")]
+pub ext fun MIX_TagTrack(track: ptr, tag: *u8) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_UntagTrack(track: ptr, tag: *u8);
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackTags(track: ptr, count: *i32) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTaggedTracks(mixer: ptr, tag: *u8, count: *i32) ptr;
+
+# --- track playback position and timing ---
+#
+# positions and durations are in sample frames. convert with the MIX_*MSToFrames
+# and MIX_*FramesToMS helpers. the per-track variants use the track's own
+# sample rate; MIX_MSToFrames / MIX_FramesToMS take an explicit sample rate.
+
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackPlaybackPosition(track: ptr, frames: i64) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackPlaybackPosition(track: ptr) i64;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackFadeFrames(track: ptr) i64;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackLoops(track: ptr) i32;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackLoops(track: ptr, num_loops: i32) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackAudio(track: ptr) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackAudioStream(track: ptr) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackRemaining(track: ptr) i64;
+#[library("sdl-mixer")]
+pub ext fun MIX_TrackMSToFrames(track: ptr, ms: i64) i64;
+#[library("sdl-mixer")]
+pub ext fun MIX_TrackFramesToMS(track: ptr, frames: i64) i64;
+#[library("sdl-mixer")]
+pub ext fun MIX_AudioMSToFrames(audio: ptr, ms: i64) i64;
+#[library("sdl-mixer")]
+pub ext fun MIX_AudioFramesToMS(audio: ptr, frames: i64) i64;
+#[library("sdl-mixer")]
+pub ext fun MIX_MSToFrames(sample_rate: i32, ms: i64) i64;
+#[library("sdl-mixer")]
+pub ext fun MIX_FramesToMS(sample_rate: i32, frames: i64) i64;
+
+# --- playback control ---
+#
+# MIX_StopTrack takes fade_out_frames (sample frames), not milliseconds.
+# MIX_StopAllTracks and MIX_StopTag take fade_out_ms (milliseconds). the
+# idiomatic layer (sdl.mixer) converts ms to frames for MIX_StopTrack using
+# MIX_TrackMSToFrames, and exposes milliseconds uniformly.
+
+#[library("sdl-mixer")]
+pub ext fun MIX_PlayTrack(track: ptr, options: u32) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_PlayTag(mixer: ptr, tag: *u8, options: u32) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_PlayAudio(mixer: ptr, audio: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_StopTrack(track: ptr, fade_out_frames: i64) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_StopAllTracks(mixer: ptr, fade_out_ms: i64) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_StopTag(mixer: ptr, tag: *u8, fade_out_ms: i64) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_PauseTrack(track: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_PauseAllTracks(mixer: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_PauseTag(mixer: ptr, tag: *u8) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_ResumeTrack(track: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_ResumeAllTracks(mixer: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_ResumeTag(mixer: ptr, tag: *u8) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_TrackPlaying(track: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_TrackPaused(track: ptr) u8;
+
+# --- gain and frequency ---
+#
+# MIX_GetMixerGain and MIX_GetTrackGain return 1.0f on error.
+# MIX_GetTrackFrequencyRatio returns 0.0f on error.
+# MIX_GetMixerFrequencyRatio returns 1.0f on error.
+
+#[library("sdl-mixer")]
+pub ext fun MIX_SetMixerGain(mixer: ptr, gain: f32) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetMixerGain(mixer: ptr) f32;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackGain(track: ptr, gain: f32) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackGain(track: ptr) f32;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTagGain(mixer: ptr, tag: *u8, gain: f32) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetMixerFrequencyRatio(mixer: ptr, ratio: f32) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetMixerFrequencyRatio(mixer: ptr) f32;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackFrequencyRatio(track: ptr, ratio: f32) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrackFrequencyRatio(track: ptr) f32;
+
+# --- spatial audio ---
+#
+# MIX_SetTrackStereo clamps negative gains to 0 and resets the track's
+# 3D position to (0,0,0). MIX_SetTrack3DPosition and MIX_GetTrack3DPosition
+# work in a right-hand coordinate system (negative x = left, positive x =
+# right, negative z = forward, positive z = back). the listener is always
+# at (0,0,0) and cannot be moved.
+
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackOutputChannelMap(track: ptr, chmap: *i32, count: i32) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackStereo(track: ptr, gains: *StereoGains) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrack3DPosition(track: ptr, position: *Point3D) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetTrack3DPosition(track: ptr, position: *Point3D) u8;
+
+# --- group lifecycle ---
+
+#[library("sdl-mixer")]
+pub ext fun MIX_CreateGroup(mixer: ptr) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_DestroyGroup(group: ptr);
+#[library("sdl-mixer")]
+pub ext fun MIX_GetGroupProperties(group: ptr) u32;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetGroupMixer(group: ptr) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackGroup(track: ptr, group: ptr) u8;
+
+# --- callbacks ---
+#
+# all callback parameters are typed ptr. sdl.mixer always passes nil for
+# both the callback and the userdata pointer: no callback-driven mixing is
+# exposed in the idiomatic layer. the same approach is used for
+# SDL_OpenAudioDeviceStream in sdl.c.
+
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackStoppedCallback(track: ptr, cb: ptr, userdata: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackRawCallback(track: ptr, cb: ptr, userdata: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetTrackCookedCallback(track: ptr, cb: ptr, userdata: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetGroupPostMixCallback(group: ptr, cb: ptr, userdata: ptr) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_SetPostMixCallback(mixer: ptr, cb: ptr, userdata: ptr) u8;
+
+# --- device-less mixing ---
+#
+# MIX_Generate always fills the whole buffer, padding with silence. the
+# return value is the byte count of real (non-silence) audio mixed; compare
+# it separately from buffer energy when testing for silence.
+
+#[library("sdl-mixer")]
+pub ext fun MIX_Generate(mixer: ptr, buffer: ptr, buflen: i32) i32;
+
+# --- standalone audio decoder ---
+
+#[library("sdl-mixer")]
+pub ext fun MIX_CreateAudioDecoder(path: *u8, props: u32) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_CreateAudioDecoder_IO(io: ptr, closeio: u8, props: u32) ptr;
+#[library("sdl-mixer")]
+pub ext fun MIX_DestroyAudioDecoder(audiodecoder: ptr);
+#[library("sdl-mixer")]
+pub ext fun MIX_GetAudioDecoderProperties(audiodecoder: ptr) u32;
+#[library("sdl-mixer")]
+pub ext fun MIX_GetAudioDecoderFormat(audiodecoder: ptr, spec: *c.AudioSpec) u8;
+#[library("sdl-mixer")]
+pub ext fun MIX_DecodeAudio(audiodecoder: ptr, buffer: ptr, buflen: i32, spec: *c.AudioSpec) i32;
