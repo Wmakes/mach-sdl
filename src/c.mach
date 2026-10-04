@@ -665,6 +665,16 @@ pub ext fun SDL_IOFromConstMem(mem: ptr, size: usize) ptr;
 #[library("sdl")]
 pub ext fun SDL_CloseIO(context: ptr) u8;
 #[library("sdl")]
+pub ext fun SDL_ReadIO(context: ptr, ptr: ptr, size: usize) usize;
+#[library("sdl")]
+pub ext fun SDL_WriteIO(context: ptr, ptr: ptr, size: usize) usize;
+#[library("sdl")]
+pub ext fun SDL_SeekIO(context: ptr, offset: i64, whence: i32) i64;
+#[library("sdl")]
+pub ext fun SDL_TellIO(context: ptr) i64;
+#[library("sdl")]
+pub ext fun SDL_GetIOSize(context: ptr) i64;
+#[library("sdl")]
 pub ext fun SDL_RenderReadPixels(renderer: ptr, rect: *Rect) ptr;
 #[library("sdl")]
 pub ext fun SDL_RemovePath(path: *u8) u8;

@@ -1,0 +1,201 @@
+# file I/O using SDL_IOStream (sdl.file)
+#
+# Stream reads and writes files using an opaque SDL_IOStream handle. open a
+# file with open_read or open_write, then read/write/seek as needed, then
+# close it. Stream is a small record passed by value; the zero value (nil
+# handle) is invalid, check with is_valid. safe to call close on an invalid
+# handle.
+#
+# file paths are UTF-8 strings; reading/writing raw bytes; no text encoding
+# helpers here.
+
+use sdl.c;
+use sdl.error;
+use std.types.bool.bool;
+use std.types.error.err;
+use std.types.result.res;
+use std.types.size.usize;
+use std.types.string.str;
+
+# handle to an open file stream. the zero value (nil handle) is invalid
+# ---
+# handle: opaque SDL_IOStream pointer, nil when invalid
+pub rec Stream {
+    handle: ptr;
+}
+
+# seek mode: absolute position from the start of the file
+pub val SEEK_SET: i32 = 0;
+# seek mode: relative to current position
+pub val SEEK_CUR: i32 = 1;
+# seek mode: relative to end of file
+pub val SEEK_END: i32 = 2;
+
+# whether a Stream holds a live handle
+# ---
+# stream: stream to test
+# ret:    true if the handle is non-nil
+pub fun is_valid(stream: Stream) bool {
+    ret stream.handle != nil;
+}
+
+# reject a nil stream before SDL is called
+# ---
+# stream: stream the caller is about to use
+fun ready(stream: Stream) err[error.Error] {
+    if (!is_valid(stream)) {
+        ret err[error.Error].err{ error.Error.invalid{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# turn an SDL bool result into err[error.Error]
+# ---
+# succeeded: the u8 result of an SDL call, nonzero on success
+fun to_err(succeeded: u8) err[error.Error] {
+    if (succeeded == 0) {
+        ret err[error.Error].err{ error.Error.failed{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# open a file for reading. the file must exist
+# ---
+# path: UTF-8 file path
+# ret:  the new Stream, or error.Error.failed (text from error.message())
+pub fun open_read(path: str) res[Stream, error.Error] {
+    val handle: ptr = c.SDL_IOFromFile(path::*u8, "rb");
+    if (handle == nil) {
+        ret res[Stream, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Stream, error.Error].ok{ Stream{ handle: handle } };
+}
+
+# open a file for writing. creates it if it does not exist, truncates if it does
+# ---
+# path: UTF-8 file path
+# ret:  the new Stream, or error.Error.failed (text from error.message())
+pub fun open_write(path: str) res[Stream, error.Error] {
+    val handle: ptr = c.SDL_IOFromFile(path::*u8, "wb");
+    if (handle == nil) {
+        ret res[Stream, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Stream, error.Error].ok{ Stream{ handle: handle } };
+}
+
+# open a file for appending. creates it if it does not exist
+# ---
+# path: UTF-8 file path
+# ret:  the new Stream, or error.Error.failed (text from error.message())
+pub fun open_append(path: str) res[Stream, error.Error] {
+    val handle: ptr = c.SDL_IOFromFile(path::*u8, "ab");
+    if (handle == nil) {
+        ret res[Stream, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Stream, error.Error].ok{ Stream{ handle: handle } };
+}
+
+# open a file for both reading and writing. does not truncate. creates it if
+# it does not exist
+# ---
+# path: UTF-8 file path
+# ret:  the new Stream, or error.Error.failed (text from error.message())
+pub fun open_read_write(path: str) res[Stream, error.Error] {
+    val handle: ptr = c.SDL_IOFromFile(path::*u8, "r+b");
+    if (handle == nil) {
+        ret res[Stream, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Stream, error.Error].ok{ Stream{ handle: handle } };
+}
+
+# close a stream. safe on an invalid handle
+# ---
+# stream: stream to close
+pub fun close(stream: Stream) {
+    if (is_valid(stream)) {
+        c.SDL_CloseIO(stream.handle);
+    }
+}
+
+# read up to count bytes into a buffer
+# ---
+# stream: an open stream
+# buf:    buffer to read into
+# count:  maximum bytes to read
+# ret:    bytes actually read, or error.Error.invalid for a nil stream, or
+#         error.Error.failed (text from error.message())
+pub fun read(stream: Stream, buf: *u8, count: usize) res[usize, error.Error] {
+    val r: err[error.Error] = ready(stream);
+    if (sel r.err) { ret res[usize, error.Error].err{ r.err }; }
+    val n: usize = c.SDL_ReadIO(stream.handle, buf::ptr, count);
+    ret res[usize, error.Error].ok{ n };
+}
+
+# write count bytes from a buffer
+# ---
+# stream: an open stream
+# data:   buffer to write from
+# count:  bytes to write
+# ret:    bytes actually written, or error.Error.invalid for a nil stream, or
+#         error.Error.failed (text from error.message())
+pub fun write(stream: Stream, data: *u8, count: usize) res[usize, error.Error] {
+    val r: err[error.Error] = ready(stream);
+    if (sel r.err) { ret res[usize, error.Error].err{ r.err }; }
+    val n: usize = c.SDL_WriteIO(stream.handle, data::ptr, count);
+    ret res[usize, error.Error].ok{ n };
+}
+
+# seek to a position in the file
+# ---
+# stream: an open stream
+# offset: byte offset (meaning depends on whence)
+# whence: SEEK_SET (absolute), SEEK_CUR (relative), or SEEK_END (from end)
+# ret:    the new position, or error.Error.invalid for a nil stream, or
+#         error.Error.failed (text from error.message())
+pub fun seek(stream: Stream, offset: i64, whence: i32) res[i64, error.Error] {
+    val r: err[error.Error] = ready(stream);
+    if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
+    val pos: i64 = c.SDL_SeekIO(stream.handle, offset, whence);
+    if (pos < 0) {
+        ret res[i64, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[i64, error.Error].ok{ pos };
+}
+
+# the current position in the file
+# ---
+# stream: an open stream
+# ret:    the byte position, or error.Error.invalid for a nil stream, or
+#         error.Error.failed (text from error.message())
+pub fun tell(stream: Stream) res[i64, error.Error] {
+    val r: err[error.Error] = ready(stream);
+    if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
+    val pos: i64 = c.SDL_TellIO(stream.handle);
+    if (pos < 0) {
+        ret res[i64, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[i64, error.Error].ok{ pos };
+}
+
+# the total size of the file
+# ---
+# stream: an open stream
+# ret:    the byte count, or error.Error.invalid for a nil stream, or
+#         error.Error.failed (text from error.message())
+pub fun size(stream: Stream) res[i64, error.Error] {
+    val r: err[error.Error] = ready(stream);
+    if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
+    val sz: i64 = c.SDL_GetIOSize(stream.handle);
+    if (sz < 0) {
+        ret res[i64, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[i64, error.Error].ok{ sz };
+}
+
+# delete a file or empty directory
+# ---
+# path: UTF-8 path to remove
+# ret:  ok, or error.Error.failed (text from error.message())
+pub fun remove(path: str) err[error.Error] {
+    ret to_err(c.SDL_RemovePath(path::*u8));
+}
