@@ -1,0 +1,27 @@
+# aggregate surface re-exporting every mach-sdl module
+
+fwd sdl.audio;
+fwd sdl.clipboard;
+fwd sdl.c;
+fwd sdl.color;
+fwd sdl.core;
+fwd sdl.error;
+fwd sdl.event;
+fwd sdl.font;
+fwd sdl.gl;
+fwd sdl.image;
+fwd sdl.img;
+fwd sdl.key;
+fwd sdl.mixer;
+fwd sdl.mix;
+fwd sdl.mouse;
+fwd sdl.msgbox;
+fwd sdl.rand;
+fwd sdl.rect;
+fwd sdl.renderer;
+fwd sdl.surface;
+fwd sdl.texture;
+fwd sdl.timer;
+fwd sdl.ttf;
+fwd sdl.wav;
+fwd sdl.window;

@@ -1,9 +1,9 @@
 [project]
 id = "sdl"
-version = "0.9.0"
+version = "0.9.1"
 src = "src"
 out = "out/{target.name}/{profile.name}"
-mach = ">=6.0"
+mach = "^6"
 
 [target.linux-x86_64]
 isa = "x86_64"
@@ -37,10 +37,12 @@ float_reassoc  = false
 
 
 
-[artifact.demo]
-kind    = "bin"
-entry   = "main.mach"
-out     = "bin/demo{artifact.suffix}"
+# the library, and the only artifact `mach build .` selects
+[artifact.sdl]
+kind    = "static"
+default = true
+entry   = "lib/libsdl.mach"
+out     = "lib/sdl"
 targets = ["*"]
 link    = ["sdl", "sdl-win", "sdl-ttf", "sdl-ttf-win", "sdl-image", "sdl-image-win", "sdl-mixer", "sdl-mixer-win"]
 need    = []
