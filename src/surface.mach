@@ -1,13 +1,12 @@
 # surfaces (sdl.surface)
 #
-# a Surface is a by-value handle around SDL_Surface, a block of pixels in
-# memory. it is the stage between an image file and a Texture: SDL reads the
-# file, the binding only passes the parameters.
+# a Surface is a block of pixels in ordinary memory. turn one into a Texture
+# with texture.from_surface to draw it, or save it with image.save_png.
 #
-# load_bmp reads only BMP, because the SDL 3.2 core reads nothing else (SDL
-# 3.4 adds PNG loading to the core; this binding targets 3.2.0 and does not
-# bind it). every other format loads through sdl.image (SDL3_image), which
-# also saves.
+# load_bmp reads only BMP. every other format loads through sdl.image,
+# which can also save. surfaces also come from renderer.read_pixels and the
+# font.render_* functions. the caller owns every surface and frees it with
+# destroy, except animation frames from sdl.image.
 
 use sdl.c;
 use sdl.error;

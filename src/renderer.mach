@@ -1,11 +1,14 @@
 # 2D rendering (sdl.renderer)
 #
-# a Renderer is a by-value handle around SDL_Renderer. every fallible
-# function checks its handles first and returns error.Error.invalid for a nil
-# one, so SDL is never called with an invalid handle.
+# a Renderer draws into one window, using whatever backend SDL picks. each
+# frame: set_color + clear, draw, then present.
 #
-# use a Renderer or sdl.gl for a given window, not both: SDL_CreateRenderer
-# and SDL_GL_CreateContext both claim the window's drawable surface.
+# drawing calls use float coordinates (rect.FRect, rect.FPoint) in the
+# render target's pixels, before set_scale. textures are created with
+# sdl.texture, sdl.image or sdl.font and drawn with draw_texture.
+#
+# use a Renderer or sdl.gl for a given window, not both: both claim the
+# window's drawable surface.
 
 use sdl.c;
 use sdl.color.Color;
@@ -27,12 +30,9 @@ pub rec Renderer {
     handle: ptr;
 }
 
-# handle to an SDL texture. the zero value (nil handle) is invalid
-#
-# defined here, not in sdl.texture, because mach refuses circular module
-# dependencies and drawing needs the type while sdl.texture needs Renderer.
-# sdl.texture re-exports it, so texture.Texture and renderer.Texture name the
-# same type.
+# handle to an SDL texture. the zero value (nil handle) is invalid.
+# texture.Texture is the same type; the texture functions live in
+# sdl.texture
 # ---
 # handle: opaque SDL_Texture pointer, nil when invalid
 pub rec Texture {
@@ -59,6 +59,10 @@ pub tag Blend: u8 {
 }
 
 # which way a texture is mirrored when drawn
+# ---
+# none:       not mirrored
+# horizontal: mirrored left to right
+# vertical:   mirrored top to bottom
 pub tag Flip: u8 {
     none;
     horizontal;
@@ -106,8 +110,7 @@ fun ready_with(rend: Renderer, tex: Texture) err[error.Error] {
     ret err[error.Error].ok{};
 }
 
-# the SDL_BlendMode value of a Blend. shared with sdl.texture; not meant for
-# use outside this binding
+# internal: the SDL_BlendMode value of a Blend. used by sdl.texture
 # ---
 # mode: blend mode to convert
 pub fun blend_to_raw(mode: Blend) u32 {
@@ -120,8 +123,7 @@ pub fun blend_to_raw(mode: Blend) u32 {
     ret c.BLENDMODE_NONE;
 }
 
-# the Blend of an SDL_BlendMode value. shared with sdl.texture; not meant for
-# use outside this binding
+# internal: the Blend of an SDL_BlendMode value. used by sdl.texture
 # ---
 # raw: SDL blend mode value
 # ret: the Blend, or error.Error.unsupported for a custom SDL blend mode
@@ -283,8 +285,8 @@ pub fun read_pixels(rend: Renderer) res[surface.Surface, error.Error] {
     ret res[surface.Surface, error.Error].ok{ surface.Surface{ handle: handle } };
 }
 
-# draw into a texture instead of the window. the texture must have been
-# created with render-target access
+# draw into a texture instead of the window, until reset_target. the
+# texture must come from texture.create
 # ---
 # rend: renderer to retarget
 # tex:  texture to draw into
@@ -306,7 +308,7 @@ pub fun reset_target(rend: Renderer) err[error.Error] {
 # limit drawing to a rectangle of the target
 # ---
 # rend: renderer to change
-# rc:   clip rectangle in target pixels
+# rc:   clip rectangle, relative to the viewport
 pub fun set_clip(rend: Renderer, rc: Rect) err[error.Error] {
     val r: err[error.Error] = ready(rend);
     if (!sel r.ok) { ret r; }

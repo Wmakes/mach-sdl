@@ -1,54 +1,55 @@
 # audio mixing (sdl.mixer)
 #
-# wraps SDL3_mixer 3.2, a separate library from SDL3 itself. SDL3_mixer 3.x is
-# a ground-up redesign: there is no Mix_OpenAudio, Mix_Chunk or Mix_Music from
-# SDL2_mixer. the model: a Mixer owns Tracks which play Audio objects.
+# wraps SDL3_mixer. a Mixer plays on an audio device (or generates samples
+# for you to pull); Tracks on the mixer play Audio objects loaded from files
+# or generated. many tracks can play at once.
 #
-# lifecycle:
-#   mixer.init();
-#   val m = mixer.create_device(c.AUDIO_DEVICE_DEFAULT_PLAYBACK);
-#   val a = mixer.load_audio(m.ok, "sound.ogg", false);
-#   val t = mixer.create_track(m.ok);
-#   mixer.set_track_audio(t.ok, a.ok);
-#   mixer.play_track(t.ok, mixer.default_options());
-#   ...
-#   mixer.destroy_track(t.ok);
-#   mixer.destroy_audio(a.ok);
-#   mixer.destroy(m.ok);
-#   mixer.quit();
+# ```mach
+# val ready: err[error.Error] = mixer.init();
+# if (sel ready.err) { ret 1; }
+# val m: res[mixer.Mixer, error.Error] = mixer.create_device(mixer.DEFAULT_PLAYBACK);
+# if (sel m.ok) {
+#     val a: res[mixer.Audio, error.Error] = mixer.load_audio(m.ok, "sound.ogg", false);
+#     val t: res[mixer.Track, error.Error] = mixer.create_track(m.ok);
+#     if (sel a.ok) {
+#         if (sel t.ok) {
+#             mixer.set_track_audio(t.ok, a.ok);
+#             mixer.play_track(t.ok, mixer.default_options());
+#         }
+#         mixer.destroy_audio(a.ok);
+#     }
+#     # ... later, at shutdown:
+#     mixer.destroy(m.ok);
+# }
+# mixer.quit();
+# ```
 #
-# device-less mixer (pull mode):
-#   val m = mixer.create(audio.Format.f32{}, 2, 48000);
-#   val a = mixer.create_sine(m.ok, 440, 0.5, 2000);
-#   val t = mixer.create_track(m.ok);
-#   mixer.set_track_audio(t.ok, a.ok);
-#   mixer.play_track(t.ok, mixer.default_options());
-#   var buf: [4096]u8;
-#   val bytes = mixer.generate(m.ok, ?buf[0]::ptr, 4096);
-#   ...
+# a device-less mixer generates samples on demand instead of playing them:
 #
-# units: the idiomatic API uses milliseconds everywhere. internally it converts
-# to frames using MIX_TrackMSToFrames where the raw API requires frames.
-# MIX_StopTrack is the one raw function that takes frames; all stop/pause/
-# resume functions exposed here take milliseconds and convert.
+# ```mach
+# val m: res[mixer.Mixer, error.Error] = mixer.create(audio.Format.f32{}, 2, 48000);
+# if (sel m.ok) {
+#     var buf: [4096]u8;
+#     val bytes: i32 = mixer.generate(m.ok, (?buf[0])::ptr, 4096);
+# }
+# ```
+#
+# times are in milliseconds, except get_track_fade_frames and audio_frames,
+# which report sample frames.
 #
 # ownership:
-#   - destroy(m) closes the device (if a device mixer) and destroys every Track
-#     and Group owned by m, but NOT Audio (audio can be shared).
-#   - Audio is reference-counted. destroy_audio(a) unrefs it; a track still
-#     playing it keeps it alive. treat the Audio handle as invalid after destroy.
-#   - destroy_track(t) stops playback immediately (no fade) and does NOT fire
-#     the track's stopped callback.
-#   - quit(), on the last matching call, destroys everything not yet cleaned up.
-#     use no handle after quit.
+#   - destroy(m) closes the device (for a device mixer) and destroys every
+#     Track and Group of m, but NOT Audio, which can be shared.
+#   - Audio is reference-counted. destroy_audio(a) drops your reference; a
+#     track still playing it keeps it alive. treat the handle as invalid
+#     after destroy_audio.
+#   - destroy_track(t) stops playback immediately, with no fade.
+#   - quit(), on the last matching call, destroys everything not yet
+#     destroyed. use no handle after quit.
 #
-# failures are error.Error. text is available from error.message() right after
-# the failing call. a nil handle is rejected as error.Error.invalid before SDL
-# is called.
-#
-# not wrapped here (available in sdl.mix for direct use): tracks fed from
-# SDL_AudioStream or SDL_IOStream, all five callbacks, metadata property
-# getters, MIX_LoadAudioWithProperties, and the no-copy loaders.
+# not wrapped here (use the raw functions in sdl.mix): tracks fed from an
+# SDL_AudioStream or SDL_IOStream, callbacks, metadata properties,
+# MIX_LoadAudioWithProperties, and the no-copy loaders.
 
 use sdl.audio;
 use sdl.c;
@@ -61,6 +62,9 @@ use std.types.error.err;
 use std.types.option.opt;
 use std.types.result.res;
 use std.types.string.str;
+
+# create_device id for the system's default playback device
+pub val DEFAULT_PLAYBACK: u32 = c.AUDIO_DEVICE_DEFAULT_PLAYBACK;
 
 # handle to an open mixer. the zero value (nil handle) is invalid
 # ---
@@ -132,15 +136,12 @@ pub rec Spec {
     freq:     i32;
 }
 
-# a 3D position in SDL_mixer's coordinate system.
-# negative x is left, positive x is right.
-# negative y is down, positive y is up.
-# negative z is forward, positive z is back.
-# the listener is always at (0,0,0) and cannot be moved.
+# a 3D position relative to the listener, who is always at (0,0,0) facing
+# negative z (the same right-handed axes as OpenGL)
 # ---
-# x: left-right axis
-# y: down-up axis
-# z: back-forward axis
+# x: negative is left, positive is right
+# y: negative is down, positive is up
+# z: negative is in front, positive is behind
 pub rec Position {
     x: f32;
     y: f32;
@@ -370,11 +371,10 @@ pub fun decoder_name(index: i32) res[str, error.Error] {
 
 # --- mixer ---
 
-# open a mixer bound to an audio device. the device provides its native
-# format; passing SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK (c.AUDIO_DEVICE_DEFAULT_PLAYBACK)
-# opens the default output. MIX_Init must have been called first
+# open a mixer that plays on an audio device, in the device's own format.
+# call init() first
 # ---
-# devid: SDL audio device id
+# devid: DEFAULT_PLAYBACK, or the id of an audio.Device
 # ret:   the new Mixer, or error.Error.failed (text from error.message())
 pub fun create_device(devid: u32) res[Mixer, error.Error] {
     val h: ptr = mix.MIX_CreateMixerDevice(devid, nil);
@@ -384,9 +384,8 @@ pub fun create_device(devid: u32) res[Mixer, error.Error] {
     ret res[Mixer, error.Error].ok{ Mixer{ handle: h } };
 }
 
-# create a device-less mixer. pull samples with generate(). the spec must
-# not be nil; SDL rejects a nil spec for device-less mixers. MIX_Init must
-# have been called first
+# create a device-less mixer that produces samples only when you call
+# generate(). call init() first
 # ---
 # fmt:      sample format
 # channels: channel count
@@ -403,7 +402,7 @@ pub fun create(fmt: audio.Format, channels: i32, freq: i32) res[Mixer, error.Err
 
 # destroy a mixer. for a device mixer, closes the device too. destroys every
 # Track and Group of this mixer, but NOT Audio objects (audio can be shared).
-# safe on a nil handle
+# do not use those tracks or groups afterwards. safe on a nil handle
 # ---
 # m: mixer to destroy
 pub fun destroy(m: Mixer) {
@@ -436,7 +435,7 @@ pub fun set_mixer_gain(m: Mixer, gain: f32) err[error.Error] {
     ret to_err(mix.MIX_SetMixerGain(m.handle, gain));
 }
 
-# the master gain of a mixer. returns 1.0 on error (per SDL_mixer source)
+# the master gain of a mixer. 1.0 if never set, and on error
 # ---
 # m:   mixer to query
 # ret: the gain; 1.0 on error
@@ -445,10 +444,11 @@ pub fun get_mixer_gain(m: Mixer) f32 {
     ret mix.MIX_GetMixerGain(m.handle);
 }
 
-# set the frequency ratio of a mixer. 1.0 is normal speed
+# set the playback speed and pitch of the whole mix. 1.0 is normal; above
+# is faster and higher, below is slower and lower
 # ---
 # m:     mixer to adjust
-# ratio: the new ratio
+# ratio: the new ratio, 0.01 to 100.0
 pub fun set_mixer_freq_ratio(m: Mixer, ratio: f32) err[error.Error] {
     val r: err[error.Error] = mixer_ready(m);
     if (!sel r.ok) { ret r; }
@@ -497,14 +497,16 @@ pub fun play_audio(m: Mixer, a: Audio) err[error.Error] {
     ret to_err(mix.MIX_PlayAudio(m.handle, a.handle));
 }
 
-# pull samples from a device-less mixer into a buffer. always fills buflen
-# bytes, padding with silence when audio runs out. the return value is the
-# byte count of real (non-silence) audio; 0 means the mixer is silent
+# pull samples from a device-less mixer (see create) into a buffer, in the
+# mixer's format. on success all buflen bytes are written, padded with
+# silence when the playing tracks run out
 # ---
 # m:      device-less mixer
 # buf:    buffer to fill
-# buflen: size of buf in bytes
-# ret:    bytes of real audio mixed into buf
+# buflen: size of buf in bytes, a whole number of frames (e.g. a multiple
+#         of 8 for stereo f32)
+# ret:    bytes of real audio, not counting the silence padding (0 when
+#         nothing is playing); 0 for a nil mixer, -1 if SDL fails
 pub fun generate(m: Mixer, buf: ptr, buflen: i32) i32 {
     if (!is_mixer_valid(m)) { ret 0; }
     ret mix.MIX_Generate(m.handle, buf, buflen);
@@ -560,11 +562,11 @@ pub fun destroy_audio(a: Audio) {
     }
 }
 
-# the duration of an audio object in milliseconds.
-# use audio_frames for the raw frame count
+# the duration of an audio object in milliseconds
 # ---
 # a:   audio to query
-# ret: duration in milliseconds, or an error.Error on failure
+# ret: duration in milliseconds, or error.Error.failed when the duration is
+#      unknown or infinite (e.g. an endless create_sine tone)
 pub fun audio_duration_ms(a: Audio) res[i64, error.Error] {
     val r: err[error.Error] = audio_ready(a);
     if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
@@ -573,10 +575,11 @@ pub fun audio_duration_ms(a: Audio) res[i64, error.Error] {
     ret res[i64, error.Error].ok{ mix.MIX_AudioFramesToMS(a.handle, frames) };
 }
 
-# the duration of an audio object in sample frames (raw, not milliseconds)
+# the duration of an audio object in sample frames
 # ---
 # a:   audio to query
-# ret: duration in frames, or an error.Error on failure
+# ret: duration in frames, or error.Error.failed when the duration is
+#      unknown or infinite
 pub fun audio_frames(a: Audio) res[i64, error.Error] {
     val r: err[error.Error] = audio_ready(a);
     if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
@@ -705,10 +708,12 @@ pub fun is_paused(t: Track) bool {
     ret mix.MIX_TrackPaused(t.handle) != 0;
 }
 
-# how many milliseconds of audio remain on a track
+# how many milliseconds of audio remain on a track, ignoring loops and
+# fades. 0 for a stopped track
 # ---
 # t:   track to query
-# ret: remaining milliseconds, or an error.Error on failure
+# ret: remaining milliseconds, or error.Error.failed when the length is
+#      unknown
 pub fun get_track_remaining_ms(t: Track) res[i64, error.Error] {
     val r: err[error.Error] = track_ready(t);
     if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
@@ -729,7 +734,9 @@ pub fun get_track_position_ms(t: Track) res[i64, error.Error] {
     ret res[i64, error.Error].ok{ mix.MIX_TrackFramesToMS(t.handle, frames) };
 }
 
-# seek to a position in milliseconds. the track must be playing or paused
+# seek to a position in milliseconds. a paused track resumes from there.
+# seeking a stopped track is allowed, but play_track starts from its
+# start_ms option anyway. the audio must be seekable
 # ---
 # t:  track to seek
 # ms: new position in milliseconds
@@ -750,7 +757,7 @@ pub fun set_track_gain(t: Track, gain: f32) err[error.Error] {
     ret to_err(mix.MIX_SetTrackGain(t.handle, gain));
 }
 
-# the gain of a track. returns 1.0 on error (per SDL_mixer source)
+# the gain of a track. 1.0 if never set, and on error
 # ---
 # t:   track to query
 # ret: the gain; 1.0 on error
@@ -759,18 +766,19 @@ pub fun get_track_gain(t: Track) f32 {
     ret mix.MIX_GetTrackGain(t.handle);
 }
 
-# set the frequency ratio of a track. 1.0 is normal speed
+# set the playback speed and pitch of one track. 1.0 is normal
 # ---
 # t:     track to adjust
-# ratio: the new ratio
+# ratio: the new ratio, 0.01 to 100.0
 pub fun set_track_freq_ratio(t: Track, ratio: f32) err[error.Error] {
     val r: err[error.Error] = track_ready(t);
     if (!sel r.ok) { ret r; }
     ret to_err(mix.MIX_SetTrackFrequencyRatio(t.handle, ratio));
 }
 
-# set how many times a track loops after the first play.
-# 0 = play once, -1 = loop forever. values below -1 are clamped to -1 by SDL
+# change how many more times a playing track loops. 0 = no more loops,
+# -1 = loop forever. no effect on a stopped track: use PlayOptions.loops
+# when starting it
 # ---
 # t:         track to configure
 # num_loops: loop count
@@ -789,8 +797,8 @@ pub fun get_track_loops(t: Track) i32 {
     ret mix.MIX_GetTrackLoops(t.handle);
 }
 
-# set independent left and right channel gains for a track. negative gains
-# are clamped to 0 by SDL. calling this resets any 3D position to (0,0,0)
+# play a track in stereo with separate left and right gains. negative gains
+# count as 0. this replaces any 3D position (see set_track_3d_position)
 # ---
 # t:     track to configure
 # left:  left-channel gain (0.0 silent, 1.0 unity)
@@ -803,10 +811,9 @@ pub fun set_track_stereo(t: Track, left: f32, right: f32) err[error.Error] {
 }
 
 # pan a track from -1.0 (full left) to 1.0 (full right). 0.0 is center.
-# the near side is held at gain 1.0; the far side falls off linearly.
-# this formula is a binding invention, not SDL's own: pan=0.5 gives
-# {left=0.5, right=1.0}. calling this resets any 3D position to (0,0,0),
-# because it calls MIX_SetTrackStereo
+# the side being panned toward stays at gain 1.0 and the other side falls
+# off linearly: pan=0.5 gives left 0.5, right 1.0. this replaces any 3D
+# position
 # ---
 # t:   track to pan
 # pan: position, -1.0 to 1.0
@@ -817,9 +824,10 @@ pub fun set_track_pan(t: Track, pan: f32) err[error.Error] {
     ret to_err(mix.MIX_SetTrackStereo(t.handle, ?gains));
 }
 
-# set the 3D position of a track. the listener is at (0,0,0). negative x
-# is left, negative z is forward. calling MIX_SetTrackStereo after this
-# resets the 3D position to (0,0,0)
+# place a track in 3D space around the listener. the sound gets quieter
+# with distance and is spread across the speakers by direction; the track
+# is mixed down to mono for this. set_track_stereo or set_track_pan
+# afterwards turns this off again
 # ---
 # t: track to position
 # p: position in 3D space
@@ -964,7 +972,8 @@ pub fun set_tag_gain(m: Mixer, tag: str, gain: f32) err[error.Error] {
 
 # --- standalone decoder ---
 
-# open a decoder for a file. requires MIX_Init but no mixer
+# open a decoder that reads a file's samples directly, without a mixer.
+# call init() first
 # ---
 # path: path to the audio file
 # ret:  the new Decoder, or error.Error.failed (text from error.message())
@@ -999,15 +1008,15 @@ pub fun get_decoder_format(d: Decoder) res[Spec, error.Error] {
     ret raw_to_spec(raw);
 }
 
-# decode audio into a buffer. spec controls the output format; pass nil to
-# use the decoder's native format. returns bytes decoded, 0 at end of stream,
-# negative on error
+# decode the next part of the file into a buffer, converted to the format
+# you ask for (which may change between calls)
 # ---
 # d:      decoder to read from
 # buf:    buffer to write into
 # buflen: size of buf in bytes
-# spec:   output format spec, or nil for the decoder's native format
-# ret:    bytes written (0 = end of stream, negative = error)
+# spec:   the format to decode into, as a c.AudioSpec (use the values from
+#         get_decoder_format for no conversion)
+# ret:    bytes written; 0 once the whole file has been decoded, -1 on error
 pub fun decode(d: Decoder, buf: ptr, buflen: i32, spec: *c.AudioSpec) i32 {
     if (!is_decoder_valid(d)) { ret 0 - 1; }
     ret mix.MIX_DecodeAudio(d.handle, buf, buflen, spec);

@@ -1,30 +1,31 @@
 # TrueType text rendering (sdl.font)
 #
-# wraps SDL3_ttf, a separate library from SDL3 itself. a Font is a by-value
-# handle around TTF_Font. every fallible function checks its handle first and
-# returns error.Error.invalid for a nil one, so SDL3_ttf is never called with
-# an invalid handle. failures are reported as error.Error; the text is read
-# with error.message(), because SDL3_ttf reports through SDL_GetError.
+# wraps SDL3_ttf. call init() once, open a Font at a point size, and render
+# text to a Texture (or a Surface). error.message() gives the reason for a
+# failure.
 #
-# typical use:
+# ```mach
+# val ready: err[error.Error] = font.init();
+# if (sel ready.err) { ret 1; }
+# val f: res[font.Font, error.Error] = font.open("DejaVuSans.ttf", 24.0);
+# if (sel f.ok) {
+#     val white: Color = Color{ r: 255, g: 255, b: 255, a: 255 };
+#     val tex: res[texture.Texture, error.Error] = font.render_texture(rend, f.ok, "hello", white);
+#     if (sel tex.ok) {
+#         # draw with renderer.draw_texture, size it with texture.size
+#         texture.destroy(tex.ok);
+#     }
+#     font.close(f.ok);
+# }
+# font.quit();
+# ```
 #
-#   font.init();
-#   val f = font.open("DejaVuSans.ttf", 24.0);
-#   val tex = font.render_texture(rend, f.ok, "hello", Color{ r: 255, g: 255, b: 255, a: 255 });
-#   ...draw tex with renderer.draw_texture, size it with texture.size...
-#   texture.destroy(tex.ok);
-#   font.close(f.ok);
-#   font.quit();
+# rendering is slow compared to drawing: each call rasterizes the whole
+# string. for text that changes rarely, keep the Texture and only render
+# again when the string or color changes.
 #
-# rendering to a texture is the slow path if text changes every frame: each
-# call rasterizes the whole string and uploads a new texture. cache the
-# Texture and only re-render when the string or color changes.
-#
-# empty strings cannot be rendered (SDL3_ttf fails on zero-width text); the
-# render functions report that as error.Error.failed.
-#
-# text is passed as a NUL-terminated str and never with an explicit length,
-# so strings with embedded NULs are not supported. the text must be UTF-8.
+# empty strings cannot be rendered; the render functions report them as
+# error.Error.failed. text must be UTF-8 and cannot contain NUL bytes.
 
 use sdl.color.Color;
 use sdl.error;
@@ -141,8 +142,9 @@ pub fun version() i32 {
     ret ttf.TTF_Version();
 }
 
-# initialize SDL3_ttf. call once before open(). SDL itself does not need to
-# be initialized first, but rendering to a Texture needs a Renderer
+# initialize SDL3_ttf. call before open(). core.init is not needed first,
+# but rendering to a Texture needs a Renderer. each init needs a matching
+# quit
 # ---
 # ret: ok, or err with error.Error.failed (text from error.message())
 pub fun init() err[error.Error] {

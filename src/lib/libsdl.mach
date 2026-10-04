@@ -1,4 +1,105 @@
-# aggregate surface re-exporting every mach-sdl module
+# mach-sdl: SDL3 bindings for mach
+#
+# SDL3 windows, input, 2D rendering, OpenGL contexts and audio, plus
+# SDL3_ttf (text), SDL3_image (image files) and SDL3_mixer (audio mixing).
+#
+# ## setup
+#
+# add the dependency to your mach.toml:
+#
+# ```toml
+# [dep.sdl]
+# git = "https://github.com/Wmakes/mach-sdl"
+# ref = "branch/master"
+# ```
+#
+# then import the modules you use, e.g. `use sdl.window;`. a program also
+# needs `use std.runtime;` and a `#[symbol("main")]` main function, as in
+# the quick start below. at run time the
+# SDL3, SDL3_ttf, SDL3_image and SDL3_mixer shared libraries must be
+# installed (on Windows, put the four DLLs next to your .exe).
+#
+# ## conventions
+#
+# - handles (Window, Renderer, Texture, Font, ...) are small records passed
+#   by value. the zero value is invalid; check with the module's is_valid.
+# - fallible calls return err[error.Error] or res[T, error.Error]. the tag
+#   says why (failed, invalid, unsupported); error.message() gives SDL's
+#   text, right after the failing call.
+# - a nil handle is rejected with error.Error.invalid before SDL is called.
+# - every destroy/close function is safe to call on an invalid handle.
+# - strings handed out by SDL are borrowed unless the docs say otherwise.
+#
+# ## quick start
+#
+# ```mach
+# use sdl.color.Color;
+# use sdl.core;
+# use sdl.error;
+# use sdl.event;
+# use sdl.key;
+# use sdl.rect.FRect;
+# use sdl.renderer;
+# use sdl.window;
+# use std.runtime;
+# use std.types.bool.bool;
+# use std.types.bool.false;
+# use std.types.bool.true;
+# use std.types.error.err;
+# use std.types.option.opt;
+# use std.types.result.res;
+#
+# #[symbol("main")]
+# fun main(argc: i64, argv: **u8) i64 {
+#     val ok: err[error.Error] = core.init(core.VIDEO);
+#     if (sel ok.err) { ret 1; }
+#     val win: res[window.Window, error.Error] = window.create("hello", 800, 600, window.RESIZABLE);
+#     if (sel win.err) { core.quit(); ret 1; }
+#     val rend: res[renderer.Renderer, error.Error] = renderer.create(win.ok);
+#     if (sel rend.err) { window.destroy(win.ok); core.quit(); ret 1; }
+#
+#     var running: bool = true;
+#     for (running) {
+#         for (true) {
+#             val ev: opt[event.Event] = event.poll();
+#             if (!sel ev.some) { brk; }
+#             val e: event.Event = ev.some;
+#             if (sel e.quit) { running = false; }
+#             if (sel e.key_down) {
+#                 if (e.key_down.scancode == key.ESCAPE) { running = false; }
+#             }
+#         }
+#         renderer.set_color(rend.ok, Color{ r: 30, g: 30, b: 40, a: 255 });
+#         renderer.clear(rend.ok);
+#         renderer.set_color(rend.ok, Color{ r: 220, g: 80, b: 60, a: 255 });
+#         renderer.fill_rect(rend.ok, FRect{ x: 100.0, y: 100.0, w: 200.0, h: 150.0 });
+#         renderer.present(rend.ok);
+#     }
+#
+#     renderer.destroy(rend.ok);
+#     window.destroy(win.ok);
+#     core.quit();
+#     ret 0;
+# }
+# ```
+#
+# ## modules
+#
+# - sdl.core: init, quit, headless drivers
+# - sdl.error: the Error tag and message()
+# - sdl.window: create and manage windows
+# - sdl.event: poll the event queue as typed events
+# - sdl.key / sdl.mouse: keyboard and mouse state
+# - sdl.renderer / sdl.texture / sdl.surface: 2D drawing
+# - sdl.rect / sdl.color: geometry and color values
+# - sdl.gl: OpenGL contexts, as an alternative to sdl.renderer
+# - sdl.font: TrueType text (SDL3_ttf)
+# - sdl.image: load and save image files (SDL3_image)
+# - sdl.audio / sdl.wav: simple sample playback
+# - sdl.mixer: full audio mixing (SDL3_mixer)
+# - sdl.timer / sdl.rand / sdl.clipboard / sdl.msgbox: utilities
+# - sdl.c, sdl.ttf, sdl.img, sdl.mix: raw C functions, for anything the
+#   modules above do not wrap
 
 fwd sdl.audio;
 fwd sdl.clipboard;
@@ -25,3 +126,5 @@ fwd sdl.timer;
 fwd sdl.ttf;
 fwd sdl.wav;
 fwd sdl.window;
+
+fwd error.Error;

@@ -1,30 +1,36 @@
 # points and rectangles (sdl.rect)
 #
-# plain value records with the exact C layout of SDL_Point, SDL_FPoint,
-# SDL_Rect and SDL_FRect, so a pointer to one can be handed to SDL as is.
-# the layouts are asserted by the tests at the end of this file.
-#
-# intersects and intersection call SDL. contains is written in mach because
-# SDL_PointInRectFloat is SDL_FORCE_INLINE in SDL's header: it is never
-# exported from the library, so there is no symbol to bind.
+# plain value records for positions and areas. the renderer draws with the
+# float versions (FPoint, FRect); renderer.set_clip takes an integer Rect.
+# all of them can be built with a literal, e.g.
+# FRect{ x: 10.0, y: 20.0, w: 64.0, h: 64.0 }.
 
 use sdl.c;
 use std.types.bool.bool;
 use std.types.option.opt;
 
 # an integer point
+# ---
+# x: horizontal position
+# y: vertical position
 pub rec Point {
     x: i32;
     y: i32;
 }
 
 # a float point
+# ---
+# x: horizontal position
+# y: vertical position
 pub rec FPoint {
     x: f32;
     y: f32;
 }
 
-# an integer rectangle: top-left corner and size
+# an integer rectangle
+# ---
+# x, y: top-left corner
+# w, h: width and height
 pub rec Rect {
     x: i32;
     y: i32;
@@ -32,7 +38,10 @@ pub rec Rect {
     h: i32;
 }
 
-# a float rectangle: top-left corner and size
+# a float rectangle
+# ---
+# x, y: top-left corner
+# w, h: width and height
 pub rec FRect {
     x: f32;
     y: f32;
@@ -62,8 +71,10 @@ pub fun intersection(a: FRect, b: FRect) opt[FRect] {
     ret opt[FRect].some{ result };
 }
 
-# whether a point lies inside a rectangle. the left and top edges are
-# inside, the right and bottom edges are outside (same as SDL_PointInRectFloat)
+# whether a point lies inside a rectangle. the left and top edges count as
+# inside, the right and bottom edges as outside, so two rectangles that
+# share an edge never both contain a point on it. (SDL's own
+# SDL_PointInRectFloat counts all four edges as inside.)
 # ---
 # r: rectangle to test against
 # p: point to test

@@ -1,14 +1,13 @@
 # OpenGL context management (sdl.gl)
 #
-# a GlContext is a by-value handle around an SDL GL context. create_context
-# makes the new context current, and proc_address is the handoff point to a
-# GL loader: load each GL function with it and reinterpret the result with
-# `:~`. a `ptr` and a function-pointer type are both one machine word, so the
-# bit-reinterpret is the right cast here.
+# create the window with window.OPENGL, then create_context makes a GL
+# context and makes it current. each frame, draw with GL and call swap.
 #
-# use a GlContext or sdl.renderer for a given window, not both. the window
-# must be created with window.OPENGL, and the dummy video driver cannot
-# create GL contexts.
+# this binding does not include GL itself. load each GL function with
+# proc_address and reinterpret the address as a function type with `:~`.
+#
+# use a GlContext or sdl.renderer for a given window, not both. the dummy
+# video driver (core.use_dummy_video) cannot create GL contexts.
 
 use sdl.c;
 use sdl.error;

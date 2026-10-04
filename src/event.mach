@@ -1,14 +1,33 @@
 # event queue with typed events (sdl.event)
 #
-# nothing from sdl.c leaves this module. poll() decodes one raw SDL event
-# into the Event tag below, and returns none when the queue is empty.
+# call poll() in a loop each frame until it returns none. each event is a
+# case of the Event tag; test the case with sel and read its payload:
+#
+# ```mach
+# for (true) {
+#     val ev: opt[event.Event] = event.poll();
+#     if (!sel ev.some) { brk; }
+#     val e: event.Event = ev.some;
+#     if (sel e.quit) { running = false; }
+#     if (sel e.key_down) {
+#         if (e.key_down.scancode == key.ESCAPE) { running = false; }
+#     }
+# }
+# ```
+#
+# the event queue only fills while SDL is initialized with core.VIDEO or
+# core.EVENTS.
 
 use sdl.c;
 use std.types.bool.bool;
 use std.types.option.opt;
 use std.types.string.str;
 
-# window-level event: close request, resize, focus changes
+# a window event
+# ---
+# window: id of the window the event is for
+# width:  new width in screen coordinates (window_resized only, else 0)
+# height: new height in screen coordinates (window_resized only, else 0)
 pub rec WindowEvent {
     window: u32;
     width:  i32;
@@ -17,8 +36,9 @@ pub rec WindowEvent {
 
 # keyboard press or release
 # ---
-# scancode: physical key, compare with the key module constants
-# mods:     modifier bits, see key.MOD_*
+# window:   id of the window with keyboard focus
+# scancode: physical key, compare with the sdl.key constants
+# mods:     modifier bits held at the time, test with key.MOD_*
 # repeat:   true when the press is an auto-repeat
 pub rec KeyEvent {
     window:   u32;
@@ -29,9 +49,10 @@ pub rec KeyEvent {
 
 # mouse movement
 # ---
-# x, y:   position in window coordinates
-# dx, dy: movement since the last event
-# buttons: bitmask of buttons held, see mouse.LEFT and friends
+# window:  id of the window with mouse focus
+# x, y:    position in window coordinates
+# dx, dy:  movement since the last motion event
+# buttons: bitmask of held buttons, test with mouse.held(buttons, mouse.LEFT)
 pub rec MouseMotion {
     window:  u32;
     x:       f32;
@@ -43,7 +64,9 @@ pub rec MouseMotion {
 
 # mouse button press or release
 # ---
-# button: which button, see mouse.LEFT and friends
+# window: id of the window with mouse focus
+# x, y:   cursor position in window coordinates
+# button: which button: mouse.LEFT, MIDDLE, RIGHT, X1 or X2
 # clicks: 1 for a single click, 2 for a double click, and so on
 pub rec MouseButton {
     window: u32;
@@ -55,7 +78,10 @@ pub rec MouseButton {
 
 # mouse wheel movement
 # ---
-# dx, dy: scroll amount (positive is up or right)
+# window: id of the window with mouse focus
+# x, y:   cursor position in window coordinates
+# dx, dy: scroll amount; positive dy is away from the user, positive dx is
+#         to the right
 pub rec MouseWheel {
     window: u32;
     x:      f32;
@@ -64,10 +90,14 @@ pub rec MouseWheel {
     dy:     f32;
 }
 
-# text typed by the user. SDL only sends these after text input is started,
-# which is not wrapped yet
+# text typed by the user
+#
+# SDL only sends these while text input is on for a window. there is no
+# wrapper for that yet; call the raw c.SDL_StartTextInput(win.handle) and
+# c.SDL_StopTextInput(win.handle) from sdl.c.
 # ---
-# text: borrowed; valid until the next poll()
+# window: id of the window with keyboard focus
+# text:   UTF-8 text, borrowed: valid until the next poll()
 pub rec TextInput {
     window: u32;
     text:   str;
@@ -75,7 +105,20 @@ pub rec TextInput {
 
 # one event from the queue
 # ---
-# unknown:  an SDL event type this binding does not map yet, raw type value
+# unknown:             an SDL event this binding does not map; the payload
+#                      is SDL's raw event type number
+# quit:                the user asked to quit (e.g. closed the last window)
+# window_close:        the user asked to close one window
+# window_resized:      a window changed size
+# window_focus_gained: a window gained keyboard focus
+# window_focus_lost:   a window lost keyboard focus
+# key_down:            a key was pressed (or auto-repeated)
+# key_up:              a key was released
+# mouse_motion:        the mouse moved
+# mouse_button_down:   a mouse button was pressed
+# mouse_button_up:     a mouse button was released
+# mouse_wheel:         the wheel was scrolled
+# text_input:          text was typed (see TextInput)
 pub tag Event: u8 {
     unknown: u32;
     quit;

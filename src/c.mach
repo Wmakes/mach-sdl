@@ -1,22 +1,19 @@
-# raw C-ABI imports of SDL 3.2
+# raw SDL3 functions (sdl.c)
 #
-# every SDL function is a pub ext fun with its C name and C-faithful types,
-# transcribed directly from SDL3's own headers at the release-3.2.0 tag
-# (SDL_init.h, SDL_error.h, SDL_video.h, SDL_events.h, SDL_mouse.h,
-# SDL_keyboard.h, SDL_timer.h, SDL_rect.h, SDL_render.h, SDL_surface.h,
-# SDL_audio.h, SDL_clipboard.h, SDL_messagebox.h, SDL_blendmode.h,
-# SDL_stdinc.h, SDL_iostream.h / SDL_filesystem.h (SDL_image glue),
-# SDL_properties.h (SDL_mixer glue)). SDL3's `bool` is a real
-# C99 _Bool (1 byte), so every SDL bool-returning function is declared `u8`
-# here and unwrapped with `!= 0` in the idiomatic wrapper modules, the same
-# way mach-glfw unwraps GLFW's int-based booleans in its own core.mach.
+# the C functions, constants and structs of SDL3 under their C names, for
+# anything the other sdl modules do not wrap. prefer those modules. C
+# `bool` is u8 here (nonzero is true), `const char *` is *u8 (a str
+# converts), and SDL objects are ptr: pass the handle of a wrapper record,
+# e.g. c.SDL_StartTextInput(win.handle).
 #
-# scope: init/quit, hints, window, GL context, events, keyboard, mouse,
+# bound: init/quit, hints, window, GL context, events, keyboard, mouse,
 # text input, timing, rects, random numbers, the 2D renderer and textures,
-# clipboard, message boxes, audio (playback, device list, WAV),
-# SDL_IOStream / SDL_RemovePath (SDL_image glue),
-# SDL_Properties (SDL_mixer glue). not bound: gamepad, joystick, haptics,
-# camera, sensors.
+# clipboard, message boxes, audio streams and WAV, SDL_IOStream and
+# SDL_Properties. not bound: gamepad, joystick, haptics, camera, sensors.
+
+# maintainer notes: transcribed from SDL3's headers at release-3.2.0. SDL3's
+# `bool` is a 1-byte C99 _Bool, so every SDL bool is declared u8 and
+# unwrapped with `!= 0` in the wrapper modules.
 
 use std.types.size.usize;
 
@@ -35,6 +32,9 @@ pub ext fun SDL_Quit();
 # video driver (see core.use_dummy_video), so SDL can run with no display
 # server. the test blocks in this file only check struct layouts and do not
 # call into SDL.
+
+# set an SDL hint (configuration variable) by name. call before the
+# subsystem it affects is initialized
 #[library("sdl")]
 pub ext fun SDL_SetHint(name: *u8, value: *u8) u8;
 
@@ -76,6 +76,9 @@ pub val EVENT_KEY_UP:   u32 = 0x301;
 # across SDL versions. `event_type` is the discriminant; reinterpret the
 # same bytes as KeyboardEvent once you've checked it -- same trick
 # std.term.windows' InputRecord needed.
+
+# a raw SDL_Event: 128 bytes whose first field is the event type. after
+# checking event_type, cast a pointer to it to *KeyboardEvent and the like
 pub rec Event {
     event_type: u32;
     _pad:       [124]u8;
@@ -86,6 +89,8 @@ pub rec Event {
 # u32(4)+u32(4), scancode/key u32(4)+u32(4), mod Uint16(2), raw Uint16(2),
 # down/repeat bool(1)+bool(1) = 38 bytes, padded to 40 for the Uint64's
 # 8-byte alignment requirement.
+
+# SDL_KeyboardEvent, the layout of an Event of type EVENT_KEY_DOWN/UP
 pub rec KeyboardEvent {
     event_type: u32;
     reserved:   u32;
@@ -118,6 +123,8 @@ pub val EVENT_WINDOW_CLOSE_REQUESTED: u32 = 0x210;
 # SDL_WindowEvent, transcribed field-for-field. type/reserved u32+u32(8),
 # timestamp u64(8), windowID u32(4), data1/data2 i32+i32(8) = 28 bytes,
 # padded to 32 for the embedded u64's 8-byte alignment.
+
+# SDL_WindowEvent, the layout of the EVENT_WINDOW_* events
 pub rec WindowEvent {
     event_type: u32;
     reserved:   u32;
@@ -157,6 +164,8 @@ pub val EVENT_MOUSE_WHEEL:       u32 = 0x403;
 # SDL_MouseMotionEvent: type/reserved(8), timestamp u64(8), windowID(4),
 # which u32(4), state u32(4), x/y/xrel/yrel f32 x4(16) = 44 bytes, padded
 # to 48.
+
+# SDL_MouseMotionEvent, the layout of an EVENT_MOUSE_MOTION event
 pub rec MouseMotionEvent {
     event_type: u32;
     reserved:   u32;
@@ -178,6 +187,8 @@ test sdl_c_mousemotionevent_layout_is_48_bytes {
 # SDL_MouseButtonEvent: type/reserved(8), timestamp u64(8), windowID(4),
 # which u32(4), button/down/clicks/padding u8 x4(4), x/y f32 x2(8) =
 # 36 bytes, padded to 40.
+
+# SDL_MouseButtonEvent, the layout of the EVENT_MOUSE_BUTTON_* events
 pub rec MouseButtonEvent {
     event_type: u32;
     reserved:   u32;
@@ -200,6 +211,8 @@ test sdl_c_mousebuttonevent_layout_is_40_bytes {
 # SDL_MouseWheelEvent: type/reserved(8), timestamp u64(8), windowID(4),
 # which u32(4), x/y f32 x2(8), direction i32(4), mouse_x/mouse_y f32 x2(8)
 # = 44 bytes, padded to 48.
+
+# SDL_MouseWheelEvent, the layout of an EVENT_MOUSE_WHEEL event
 pub rec MouseWheelEvent {
     event_type: u32;
     reserved:   u32;
@@ -265,6 +278,8 @@ pub ext fun SDL_Delay(ms: u32);
 
 # SDL_FRect: 4 f32 fields, no padding -- every offset already 4-aligned
 # and the total (16) is a multiple of 4.
+
+# SDL_FRect, the same layout as rect.FRect
 pub rec FRect {
     x: f32;
     y: f32;
@@ -315,6 +330,9 @@ pub val AUDIO_DEVICE_DEFAULT_PLAYBACK: u32 = 0xFFFFFFFF;
 # for x86_64/aarch64, which are effectively always little-endian in
 # practice. computed from SDL_DEFINE_AUDIO_FORMAT's bit-packing, not
 # guessed: (signed<<15)|(bigendian<<12)|(float<<8)|bitsize.
+
+# SDL_AudioFormat values (native little-endian), the same set as
+# audio.Format
 pub val AUDIO_FORMAT_U8:  u32 = 0x0008;
 pub val AUDIO_FORMAT_S8:  u32 = 0x8008;
 pub val AUDIO_FORMAT_S16: u32 = 0x8010;
@@ -324,6 +342,8 @@ pub val AUDIO_FORMAT_F32: u32 = 0x8120;
 # SDL_AudioSpec: format (enum, 4 bytes) + channels (int, 4) + freq (int,
 # 4) = 12 bytes, no padding -- every field is 4-byte aligned already and
 # the total is a multiple of 4.
+
+# SDL_AudioSpec: sample format, channel count and sample rate in Hz
 pub rec AudioSpec {
     format:   u32;
     channels: i32;
@@ -338,6 +358,9 @@ test sdl_c_audiospec_layout_is_12_bytes {
 # callback param is always nil here (manual push-based playback, not
 # callback-driven), so it's typed as a plain ptr rather than a real
 # function-pointer type -- there's nothing to reinterpret it as.
+
+# open the device and a stream bound to it. pass nil for callback and
+# userdata
 #[library("sdl")]
 pub ext fun SDL_OpenAudioDeviceStream(devid: u32, spec: *AudioSpec, callback: ptr, userdata: ptr) ptr;
 #[library("sdl")]
@@ -447,6 +470,7 @@ pub ext fun SDL_GetWindowSize(window: ptr, w: *i32, h: *i32) u8;
 pub ext fun SDL_SetWindowSize(window: ptr, w: i32, h: i32) u8;
 
 # --- keyboard state (SDL_keyboard.h) ---
+
 # returns SDL's own key state array, indexed by scancode; numkeys receives its length
 #[library("sdl")]
 pub ext fun SDL_GetKeyboardState(numkeys: *i32) ptr;
@@ -522,6 +546,8 @@ pub ext fun SDL_SetRenderTarget(renderer: ptr, texture: ptr) u8;
 # use the *integer* SDL_Rect, not SDL_FRect -- transcribed separately.
 # SDL_Rect: 4 int fields (x, y, w, h), no padding -- every offset already
 # 4-aligned and the total (16) is a multiple of 4.
+
+# SDL_Rect, the same layout as rect.Rect
 pub rec Rect {
     x: i32;
     y: i32;
@@ -550,6 +576,8 @@ pub ext fun SDL_GetRenderScale(renderer: ptr, scale_x: *f32, scale_y: *f32) u8;
 #
 # SDL_FPoint: 2 f32 fields, no padding -- same reasoning as FRect above
 # (every offset already 4-aligned, total already a multiple of 4).
+
+# SDL_FPoint, the same layout as rect.FPoint
 pub rec FPoint {
     x: f32;
     y: f32;

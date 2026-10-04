@@ -1,9 +1,12 @@
 # textures (sdl.texture)
 #
-# a Texture is a by-value handle around SDL_Texture, owned by the Renderer it
-# was made with. destroying the renderer also destroys its textures. every
-# fallible function checks the handle first and returns error.Error.invalid
-# for a nil one.
+# a Texture is an image stored for fast drawing, owned by the Renderer it
+# was made with. destroying the renderer also destroys its textures. draw
+# one with renderer.draw_texture or renderer.draw_texture_rotated.
+#
+# ways to get a texture: load (BMP files), image.load_texture (PNG, JPG and
+# the rest), font.render_texture (text), from_surface, and create (an empty
+# render target).
 
 use sdl.c;
 use sdl.color.Color;
@@ -16,10 +19,13 @@ use std.types.result.res;
 use std.types.string.str;
 
 # handle to an SDL texture. the zero value (nil handle) is invalid. the
-# record itself lives in sdl.renderer (see the note there) and is re-exported
+# same type as renderer.Texture
 fwd renderer.Texture;
 
 # a texture size in pixels
+# ---
+# w: width
+# h: height
 pub rec Size {
     w: f32;
     h: f32;
@@ -105,9 +111,8 @@ pub fun from_surface(rend: renderer.Renderer, surf: surface.Surface) res[Texture
 
 # load a BMP image file into a texture
 #
-# only BMP is supported here: the SDL 3.2 core reads nothing else. use
-# image.load_texture for every other format. SDL reads the file; the
-# intermediate surface is released before returning.
+# only BMP is supported here; use image.load_texture for every other
+# format.
 # ---
 # rend: renderer that will own the texture
 # path: path to a .bmp file

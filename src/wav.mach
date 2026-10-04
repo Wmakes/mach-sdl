@@ -1,12 +1,20 @@
 # WAV loading (sdl.wav)
 #
-# SDL reads the file and decodes it; the binding only passes the path in and
-# hands the result back. a Clip is the decoded sample data plus its format,
-# channel count and frequency, ready to feed to an audio Stream.
+# load decodes a .wav file into a Clip: the samples plus their format,
+# channel count and frequency. open makes a ready-to-play audio Stream from
+# it:
 #
-# the data is an SDL heap allocation owned by the Clip: release it with
-# destroy. a Stream made with open gets its own copy of the samples, so the
-# Clip can be destroyed right after open.
+# ```mach
+# val clip: res[wav.Clip, error.Error] = wav.load("beep.wav");
+# if (sel clip.ok) {
+#     val s: res[audio.Stream, error.Error] = wav.open(clip.ok);
+#     wav.destroy(clip.ok);
+#     if (sel s.ok) { audio.resume(s.ok); }
+# }
+# ```
+#
+# the Clip owns its samples: release them with destroy. a Stream from open
+# keeps its own copy, so the Clip can be destroyed right after open.
 
 use sdl.audio;
 use sdl.c;

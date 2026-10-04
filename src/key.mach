@@ -4,8 +4,12 @@
 # use it against KeyEvent.scancode and is_down(); it is the right choice for
 # movement and action keys (the physical key where QWERTY has W is labelled
 # Z on an AZERTY board, so the scancode W keeps the movement cluster under
-# the left hand there, printed ZQSD). values come from SDL_scancode.h and
-# SDL_keycode.h (SDL 3.2.x).
+# the left hand there, printed ZQSD).
+#
+# constants: letters A to Z, top-row digits NUM_0 to NUM_9, RETURN, ESCAPE,
+# BACKSPACE, TAB, SPACE, F1 to F12, the arrows LEFT, RIGHT, UP, DOWN, and
+# the modifier keys LCTRL, LSHIFT, LALT, RCTRL, RSHIFT, RALT. modifier bits
+# for KeyEvent.mods and mods() are MOD_SHIFT, MOD_CTRL, MOD_ALT, MOD_GUI.
 
 use sdl.c;
 use std.types.bool.bool;
@@ -87,12 +91,13 @@ pub val RCTRL: u32 = 228;
 pub val RSHIFT: u32 = 229;
 pub val RALT: u32 = 230;
 
-# modifier bits, tested against KeyEvent.mods and the result of mods()
-# (SDL_KMOD_* in SDL_keycode.h). MOD_SHIFT covers either shift key, and so
-# on for the others.
+# modifier bit: either shift key. test with (mods & key.MOD_SHIFT) != 0
 pub val MOD_SHIFT: u16 = 0x0003;
+# modifier bit: either ctrl key
 pub val MOD_CTRL:  u16 = 0x00C0;
+# modifier bit: either alt key
 pub val MOD_ALT:   u16 = 0x0300;
+# modifier bit: either GUI key (Windows / Command / Super)
 pub val MOD_GUI:   u16 = 0x0C00;
 
 

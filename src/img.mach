@@ -1,43 +1,26 @@
-# raw C-ABI imports of SDL3_image 3.2
+# raw SDL3_image functions (sdl.img)
 #
-# every function is a pub ext fun with its C name and C-faithful types,
-# transcribed from SDL3_image's SDL_image.h (release-3.2.6). it lives apart
-# from sdl.c because SDL3_image is a separate shared library (libSDL3_image)
-# with its own link entry in mach.toml, bound as library "sdl-image".
+# the C functions of SDL3_image under their C names, for anything
+# sdl.image does not wrap (per-format loaders, XPM arrays, stream-based
+# saving). prefer sdl.image. C `bool` is u8 (nonzero is true),
+# `const char *` is *u8, and surfaces, textures, renderers and SDL_IOStreams
+# are ptr (surface.Surface.handle and so on).
 #
-# nothing here is newer than 3.2.0 API, so it also links against every later
-# SDL3_image (the 3.4 line adds functions, it removes none). the 3.4 additions
-# (animation encoder/decoder objects, GPU textures, the other Save* formats)
-# are not bound.
+# a `closeio` of 1 makes the function close the stream when it returns, on
+# success and on failure. the per-format IMG_Load*_IO functions never close
+# it; close it yourself with c.SDL_CloseIO.
 #
-# conventions match sdl.c and sdl.ttf: SDL's `bool` is a 1-byte C99 _Bool, so
-# every bool-returning or bool-taking function is declared u8. SDL_Surface,
-# SDL_Texture, SDL_Renderer and SDL_IOStream are opaque and held as ptr.
-# `const char *` is *u8. `size_t` is usize.
-#
-# SDL3_image has no init or quit call (IMG_Init and IMG_Quit were SDL2). the
-# library is usable as soon as it is linked.
-#
-# closeio: every *_IO loader that takes a `closeio` flag closes the stream
-# before returning when it is true, on success AND on failure. passing true
-# therefore never leaks the stream. the per-format IMG_Load*_IO functions
-# have no flag and never close the stream; the caller does (SDL_CloseIO).
-#
-# type hints: IMG_LoadTyped_IO and IMG_LoadAnimationTyped_IO detect the format
-# from the data. the `type` string (a file extension, any case, may be nil)
-# is only consulted for TGA, the one format with no magic number.
-#
-# ownership: surfaces come back caller-owned (SDL_DestroySurface), textures
-# are owned by their renderer, an IMG_Animation is freed with
-# IMG_FreeAnimation, which also frees every frame surface inside it.
+# returned surfaces are yours to free (surface.destroy or
+# c.SDL_DestroySurface); textures belong to their renderer; free an
+# Animation with IMG_FreeAnimation, which also frees its frames.
 
-# IMG_Animation, transcribed field-for-field from SDL_image.h. sizes: w/h/
-# count int(4)+int(4)+int(4) = 12 bytes, padded to 16 for the pointer's 8-byte
-# alignment, then frames and delays pointers (8+8) = 32 bytes. the same on
-# SysV x86-64 and Win64.
-#
-# frames points at `count` SDL_Surface pointers, delays at `count` ints
-# (milliseconds). both arrays belong to the animation.
+# IMG_Animation, as returned by the IMG_LoadAnimation* functions
+# ---
+# w:      width of every frame in pixels
+# h:      height of every frame in pixels
+# count:  number of frames
+# frames: array of `count` SDL_Surface pointers, owned by the animation
+# delays: array of `count` i32 frame delays in milliseconds
 pub rec Animation {
     w:      i32;
     h:      i32;

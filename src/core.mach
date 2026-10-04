@@ -1,15 +1,18 @@
 # library lifecycle and headless drivers (sdl.core)
 #
-# wraps SDL_Init, SDL_Quit and the driver hints. failures are reported as
-# err[error.Error]; the SDL text is read with error.message().
+# call init() once at startup with the subsystems you need, and quit() at
+# shutdown. failures are reported as err[error.Error]; the SDL text is read
+# with error.message().
 
 use sdl.c;
 use sdl.error;
 use std.types.error.err;
 
-# subsystem flags for init(), combined with |
+# init() flag: the video subsystem (windows, rendering, GL). implies EVENTS
 pub val VIDEO:  u32 = c.INIT_VIDEO;
+# init() flag: the audio subsystem (sdl.audio, sdl.wav, device mixers)
 pub val AUDIO:  u32 = c.INIT_AUDIO;
+# init() flag: the event queue only, without video
 pub val EVENTS: u32 = c.INIT_EVENTS;
 
 # turn an SDL bool result into err[error.Error]
@@ -24,7 +27,7 @@ fun to_err(succeeded: u8) err[error.Error] {
 
 # initialize the given SDL subsystems. call before creating a window
 # ---
-# flags: bitwise OR of VIDEO, AUDIO, EVENTS
+# flags: bitwise OR of VIDEO, AUDIO, EVENTS, e.g. core.VIDEO | core.AUDIO
 # ret:   ok, or err with error.Error.failed (text from error.message())
 pub fun init(flags: u32) err[error.Error] {
     ret to_err(c.SDL_Init(flags));
@@ -37,7 +40,7 @@ pub fun quit() {
 
 # force SDL's headless "dummy" video driver. call before init(VIDEO)
 #
-# this lets tests and tooling run SDL without a display server. windows
+# this lets tests and tools run SDL without a display server. windows
 # created under it cannot use OpenGL, so gl.create_context fails there.
 # ---
 # ret: ok, or err with error.Error.failed

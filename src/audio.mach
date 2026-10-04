@@ -1,15 +1,13 @@
 # audio playback (sdl.audio)
 #
-# a Stream is a by-value handle around an SDL_AudioStream bound to the
-# default playback device (or one picked from the device list). push raw
-# samples into it with put and start it with resume (streams begin paused).
-# no callbacks and no capture; this covers "play a sound", not full audio mixing.
-# for a mixer with load, looping, fades and spatial audio, see sdl.mixer.
-# loading a WAV file into a stream lives in sdl.wav.
+# a Stream plays raw samples on the default playback device (or one picked
+# from the device list). call core.init(core.AUDIO) first, open a stream,
+# push samples into it with put, and start it with resume (streams begin
+# paused).
 #
-# every fallible function checks its handle first and returns
-# error.Error.invalid for a nil one, so SDL is never called with an invalid
-# handle. run use_dummy_audio in sdl.core before init to play headlessly.
+# this covers "play some samples". for loading compressed files, looping,
+# fades and positional audio, use sdl.mixer. to play a WAV file, see
+# sdl.wav. core.use_dummy_audio runs all of this without a sound card.
 
 use sdl.c;
 use sdl.error;
@@ -29,7 +27,7 @@ pub rec Stream {
 
 # an output device found by playback_device
 # ---
-# id:   SDL's id for the device, pass it back through open_on
+# id:   SDL's id for the device; also accepted by mixer.create_device
 # name: human-readable name, borrowed from SDL: copy it if it must outlive
 #       the next SDL call
 pub rec Device {
@@ -63,8 +61,8 @@ fun format_to_raw(format: Format) u32 {
     ret c.AUDIO_FORMAT_S16;
 }
 
-# the Format of an SDL_AudioFormat value. shared with sdl.wav; not meant for
-# use outside this binding
+# internal: the Format of an SDL_AudioFormat value. used by sdl.wav and
+# sdl.mixer
 # ---
 # raw: SDL audio format value
 # ret: the Format, or none for a format this binding does not cover
@@ -237,7 +235,11 @@ pub fun clear(stream: Stream) err[error.Error] {
     ret to_err(c.SDL_ClearAudioStream(stream.handle));
 }
 
-# how many bytes are queued in the stream
+# roughly how much audio is still waiting in the stream, in bytes
+#
+# the count is of converted audio, in the device's own format, so it need
+# not match the bytes passed to put. use it to keep the stream topped up,
+# e.g. put more once it drops below a threshold.
 # ---
 # stream: stream to query
 # ret:    the byte count, or -1 for a nil stream or if SDL reports failure

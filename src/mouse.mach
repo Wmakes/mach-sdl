@@ -1,8 +1,12 @@
 # mouse buttons, position, cursor and capture (sdl.mouse)
 #
-# the functions that act on a window take a sdl.window.Window, never a raw
-# pointer. state() and relative_state() return button bitmasks: test one
-# button with (state.buttons & (1 << (mouse.LEFT - 1))) != 0.
+# state() and relative_state() return a bitmask of held buttons; test one
+# button with held():
+#
+# ```mach
+# val st: mouse.State = mouse.state();
+# if (mouse.held(st.buttons, mouse.LEFT)) { ... }
+# ```
 
 use sdl.c;
 use sdl.error;
@@ -11,20 +15,38 @@ use std.types.bool.bool;
 use std.types.bool.false;
 use std.types.error.err;
 
+# the left button
 pub val LEFT:   u8 = c.BUTTON_LEFT;
+# the middle button (wheel click)
 pub val MIDDLE: u8 = c.BUTTON_MIDDLE;
+# the right button
 pub val RIGHT:  u8 = c.BUTTON_RIGHT;
+# the first extra button (usually "back")
 pub val X1:     u8 = c.BUTTON_X1;
+# the second extra button (usually "forward")
 pub val X2:     u8 = c.BUTTON_X2;
 
 # mouse position and held buttons
 # ---
 # x, y:    position in window coordinates, or motion deltas from relative_state()
-# buttons: bitmask of held buttons
+# buttons: bitmask of held buttons, test with held()
 pub rec State {
     x:       f32;
     y:       f32;
     buttons: u32;
+}
+
+# whether a button is set in a button bitmask
+# ---
+# buttons: a bitmask from State.buttons or MouseMotion.buttons
+# button:  LEFT, MIDDLE, RIGHT, X1 or X2
+# ret:     true if that button is held
+pub fun held(buttons: u32, button: u8) bool {
+    if (button == 0 || button > 32) {
+        ret false;
+    }
+    val bit: u32 = 1::u32 << ((button - 1)::u32);
+    ret (buttons & bit) != 0;
 }
 
 # turn an SDL bool result into err[error.Error]
@@ -48,6 +70,8 @@ fun ready(win: window.Window) err[error.Error] {
 }
 
 # the mouse position relative to the focused window, and held buttons
+# ---
+# ret: position in window coordinates and the button bitmask
 pub fun state() State {
     var x: f32 = 0.0;
     var y: f32 = 0.0;
@@ -55,8 +79,11 @@ pub fun state() State {
     ret State{ x: x, y: y, buttons: buttons };
 }
 
-# the motion since the last call, and held buttons. only meaningful while
-# relative mode is on for a window (see set_relative)
+# the mouse motion accumulated since the last call, and held buttons. the
+# usual way to read camera-look input while relative mode is on (see
+# set_relative)
+# ---
+# ret: x, y hold the motion deltas, plus the button bitmask
 pub fun relative_state() State {
     var dx: f32 = 0.0;
     var dy: f32 = 0.0;
@@ -64,7 +91,8 @@ pub fun relative_state() State {
     ret State{ x: dx, y: dy, buttons: buttons };
 }
 
-# move the cursor to a position inside a window
+# move the cursor to a position inside a window. does nothing for an
+# invalid window
 # ---
 # win: window to move the cursor within
 # x, y: target position in window coordinates
@@ -97,7 +125,8 @@ pub fun set_relative(win: window.Window, on: bool) err[error.Error] {
 
 # whether relative mode is on for a window
 # ---
-# ret: false for an invalid window
+# win: window to query
+# ret: true if relative mode is on; false for an invalid window
 pub fun is_relative(win: window.Window) bool {
     if (!window.is_valid(win)) {
         ret false;
@@ -105,8 +134,8 @@ pub fun is_relative(win: window.Window) bool {
     ret c.SDL_GetWindowRelativeMouseMode(win.handle) != 0;
 }
 
-# keep receiving mouse events while the button is held, even outside the
-# window. unlike relative mode, the cursor stays visible
+# keep receiving mouse events while a button is held, even outside the
+# window. the cursor stays visible, unlike in relative mode
 # ---
 # on: true to start capturing, false to release
 pub fun capture(on: bool) err[error.Error] {

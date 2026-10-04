@@ -1,6 +1,6 @@
 [project]
 id = "sdl"
-version = "0.9.1"
+version = "1.0.0"
 src = "src"
 out = "out/{target.name}/{profile.name}"
 mach = "^6"

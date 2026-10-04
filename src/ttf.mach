@@ -1,28 +1,10 @@
-# raw C-ABI imports of SDL3_ttf 3.2
+# raw SDL3_ttf functions (sdl.ttf)
 #
-# every function is a pub ext fun with its C name and C-faithful types,
-# transcribed from SDL3_ttf's SDL_ttf.h (release-3.2.2). it lives apart from
-# sdl.c because SDL3_ttf is a separate shared library (libSDL3_ttf) with its
-# own link entry in mach.toml, bound as library "sdl-ttf".
-#
-# conventions match sdl.c: SDL's `bool` is a 1-byte C99 _Bool, so every
-# bool-returning or bool-taking function is declared u8. TTF_Font is opaque
-# and held as ptr. `const char *` is *u8. `size_t` is usize.
-#
-# SDL_Color is passed BY VALUE to the TTF_RenderText_* functions. it is a
-# 4-byte struct of four Uint8 (r, g, b, a in memory order), which both
-# SysV x86-64 and Win64 pass as a single integer register, bit-identical to
-# a u32 whose little-endian bytes are r, g, b, a. every color parameter is
-# therefore declared u32 and packed by the idiomatic layer (sdl.font.pack).
-# this avoids relying on by-value rec passing in `ext fun`, which no other
-# binding in this project exercises. UNVERIFIED beyond x86_64: every target
-# declared in mach.toml is x86_64 (SysV on linux and darwin, Win64 on
-# windows), where the argument above holds. an aarch64 target would need
-# this re-checked.
-#
-# text length: every render and measure function takes a `length`. 0 means
-# "the string is NUL-terminated, use strlen", which is what the idiomatic
-# layer always passes.
+# the C functions of SDL3_ttf under their C names, for anything sdl.font
+# does not wrap. prefer sdl.font. C `bool` is u8 here (nonzero is true),
+# `const char *` is *u8, a TTF_Font is a ptr (font.Font.handle), and
+# SDL_Color arguments are a u32 packed as r | g << 8 | b << 16 | a << 24.
+# a text `length` of 0 means the string is NUL-terminated.
 
 use std.types.size.usize;
 

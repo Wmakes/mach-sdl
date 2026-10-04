@@ -6,11 +6,18 @@
 
 use sdl.c;
 
-# a running delta-time clock, backed by the high-resolution performance
-# counter. its units are not fixed at milliseconds the way ticks_ms is, so
-# tick converts with SDL_GetPerformanceFrequency
+# a running delta-time clock, backed by SDL's high-resolution counter.
+# make one with clock() and call tick() once per frame:
+#
+# ```mach
+# var clk: timer.Clock = timer.clock();
+# for (running) {
+#     val dt: f64 = timer.tick(?clk);
+#     # move things by speed * dt
+# }
+# ```
 # ---
-# last: performance-counter value at the last tick call
+# last: internal counter value at the last tick
 pub rec Clock {
     last: u64;
 }
@@ -22,7 +29,8 @@ pub fun ticks_ms() u64 {
     ret c.SDL_GetTicks();
 }
 
-# nanoseconds since SDL library init. higher resolution than ticks_ms
+# nanoseconds since SDL library init. higher resolution than ticks_ms; also a
+# handy rand.seed value
 # ---
 # ret: the nanosecond count
 pub fun ticks_ns() u64 {

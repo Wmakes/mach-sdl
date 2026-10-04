@@ -2,7 +2,8 @@
 #
 # wraps SDL3_image, a separate library from SDL3 itself. it reads PNG, JPG,
 # GIF, WebP, AVIF, JXL, QOI, TIF, BMP, SVG, TGA, ICO, CUR, PCX, PNM, LBM, XCF,
-# XPM and XV, and writes PNG, JPG and AVIF. there is nothing to initialize.
+# XPM and XV, and writes PNG, JPG and AVIF. there is nothing to initialize,
+# and core.init is not needed for files and surfaces.
 # every format except TGA is detected from the file's contents, not its name.
 # TGA has no signature: load() takes it from the file extension, and
 # load_mem_as() needs Format.tga.
@@ -12,25 +13,30 @@
 # error.Error.failed and the library's own text from error.message().
 #
 # failures are reported as error.Error; the text is read with
-# error.message() right after the failing call. a nil handle is rejected as
-# error.Error.invalid before SDL is called.
+# error.message() right after the failing call.
 #
-# typical use:
+# ```mach
+# val tex: res[texture.Texture, error.Error] = image.load_texture(rend, "player.png");
+# if (sel tex.ok) {
+#     # draw with renderer.draw_texture, size it with texture.size
+#     texture.destroy(tex.ok);
+# }
+# ```
 #
-#   val tex = image.load_texture(rend, "player.png");
-#   ...draw tex with renderer.draw_texture, size it with texture.size...
-#   texture.destroy(tex.ok);
+# animations load through load_animation, which accepts any image (a still
+# image is an animation of one frame):
 #
-# animations load through image.load_animation, which accepts any image
-# (a still image is an animation of one frame):
+# ```mach
+# val anim: res[image.Animation, error.Error] = image.load_animation("spin.gif");
+# if (sel anim.ok) {
+#     val frame: res[texture.Texture, error.Error] = image.animation_frame_texture(rend, anim.ok, 0);
+#     val wait: res[i32, error.Error] = image.animation_delay(anim.ok, 0);
+#     image.destroy_animation(anim.ok);
+# }
+# ```
 #
-#   val anim = image.load_animation("spin.gif");
-#   val frame = image.animation_frame_texture(rend, anim.ok, 0);
-#   val wait = image.animation_delay(anim.ok, 0);
-#   image.destroy_animation(anim.ok);
-#
-# memory loaders take a pointer and a byte count. the memory is only read
-# during the call.
+# the memory loaders (load_mem and friends) take a pointer to the encoded
+# file bytes and a byte count. the memory is only read during the call.
 
 use sdl.c;
 use sdl.error;
@@ -141,9 +147,7 @@ fun stream_of(data: *u8, size: usize) ptr {
     ret c.SDL_IOFromConstMem(data::ptr, size);
 }
 
-# the upper-case name of a Format, such as "PNG". Format.unknown is "UNKNOWN".
-# this is also the type hint string load_mem_as passes, where only "TGA"
-# changes anything
+# the upper-case name of a Format, such as "PNG". Format.unknown is "UNKNOWN"
 # ---
 # fmt: the format to name
 pub fun format_name(fmt: Format) str {
@@ -169,7 +173,7 @@ pub fun format_name(fmt: Format) str {
     ret "UNKNOWN";
 }
 
-# keep a save quality inside the 0 to 100 range SDL3_image documents
+# keep a save quality inside the 0 to 100 range
 # ---
 # quality: the caller's value
 fun clamp_quality(quality: i32) i32 {

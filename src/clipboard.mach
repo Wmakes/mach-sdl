@@ -2,10 +2,9 @@
 #
 # text only: no clipboard images or custom mime types.
 #
-# SDL_GetClipboardText hands out a fresh heap allocation on every call, so
-# the string returned by text() is NOT borrowed like error.message(): give it
-# back with free_text() when done, or it leaks. the binding does not copy it
-# into an owned string because that would need an allocator.
+# the string returned by text() is a fresh allocation on every call, NOT
+# borrowed like error.message(): give it back with free_text() when done,
+# or it leaks.
 
 use sdl.c;
 use sdl.error;

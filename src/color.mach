@@ -1,6 +1,6 @@
 # 8-bit RGBA color (sdl.color)
 #
-# a plain value record with the layout of SDL_Color (four bytes, no padding).
+# build one with a literal: Color{ r: 255, g: 128, b: 0, a: 255 }.
 
 # an RGBA color, each channel 0 to 255
 # ---

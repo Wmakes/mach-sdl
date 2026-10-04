@@ -8,6 +8,18 @@
 * **Linux:** The SDL3 development files, so that `libSDL3.so`, `libSDL3_ttf.so`, `libSDL3_image.so` and `libSDL3_mixer.so` (not just the `.so.0` symlinks) are available in a standard library directory such as `/usr/lib` or `/usr/lib/<arch>-linux-gnu`.
 * **Windows:** After building your `.exe`, you need to manually copy `SDL3.dll`, `SDL3_ttf.dll`, `SDL3_image.dll` and `SDL3_mixer.dll` into the same directory as the executable.
 
+## Usage
+
+Add this repo as a dependency in your `mach.toml`:
+
+```toml
+[dep.sdl]
+git = "https://github.com/Wmakes/mach-sdl"
+ref = "branch/master"
+```
+
+Then import the modules you need, e.g. `use sdl.window;`.
+
 ## Status
 
 `mach-sdl` is still a work in progress and does **not yet implement the entirety of SDL3**. Some APIs and functionality may be missing or incomplete.

@@ -10,9 +10,10 @@ use std.types.bool.bool;
 use std.types.size.usize;
 
 # seed the generator. call once at startup, e.g. with sdl.timer.ticks_ns()
-# for a time-based seed or a fixed value for a reproducible run
+# for a time-based seed or a fixed value for a reproducible run. without a
+# call, SDL seeds itself from the clock
 # ---
-# s: the seed
+# s: the seed; 0 makes SDL pick a time-based seed (not reproducible)
 pub fun seed(s: u64) {
     c.SDL_srand(s);
 }
@@ -41,8 +42,7 @@ pub fun range(lo: f32, hi: f32) f32 {
     ret lo + c.SDL_randf() * (hi - lo);
 }
 
-# a coin flip, roughly 50/50. named flip because a function called bool
-# would clash with the bool type this module imports
+# a coin flip, roughly 50/50
 # ---
 # ret: true or false
 pub fun flip() bool {

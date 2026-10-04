@@ -1,43 +1,20 @@
-# raw C-ABI imports of SDL3_mixer 3.2
+# raw SDL3_mixer functions (sdl.mix)
 #
-# every function is a pub ext fun with its C name and C-faithful types,
-# transcribed from SDL3_mixer's SDL_mixer.h (release-3.2.4). it lives apart
-# from sdl.c because SDL3_mixer is a separate shared library (libSDL3_mixer)
-# with its own link entry in mach.toml, bound as library "sdl-mixer".
-#
-# conventions match sdl.c: SDL's `bool` is a 1-byte C99 _Bool, so every
-# bool-returning or bool-taking function is declared u8. opaque handles
-# (MIX_Mixer *, MIX_Audio *, MIX_Track *, MIX_Group *, MIX_AudioDecoder *,
-# SDL_AudioStream *, SDL_IOStream *) are held as ptr. `const char *` is *u8.
-# `size_t` is usize. `int` is i32. `Sint64` is i64. `float` is f32.
-# SDL_PropertiesID and SDL_AudioDeviceID are u32.
-#
-# MIX_StereoGains and MIX_Point3D are the only concrete structs. both are
-# only ever passed by pointer, never by value across an ext fun boundary.
-# layout tests verify the sizes the C compiler produces.
-#
-# callbacks (MIX_TrackStoppedCallback, MIX_TrackMixCallback,
-# MIX_GroupMixCallback, MIX_PostMixCallback): the parameter is typed ptr
-# because no function in this project uses callback-driven mixing; sdl.mixer
-# always passes nil for these. the same rationale applies to
-# SDL_OpenAudioDeviceStream's callback parameter in sdl.c.
-#
-# function count: 94. a regex that matches any identifier starting with
-# `MIX_` also catches 5 type names in the header (MIX_Mixer, MIX_Audio,
-# MIX_Track, MIX_Group, MIX_AudioDecoder), giving a naive count of 99.
-#
-# version compatibility: 3.2.0, 3.2.2 and 3.2.4 export the identical 94
-# functions. PROP_PLAY_START_ORDER_NUMBER was added in 3.2.2 and
-# PROP_AUDIO_LOAD_IGNORE_LOOPS_BOOLEAN in 3.2.4; an unknown property name
-# is silently ignored by SDL, so both constants are safe to pass to any
-# 3.2.x library. the installed version at binding time is 3.2.4.
+# the C functions and property names of SDL3_mixer under their C names, for
+# anything sdl.mixer does not wrap (stream inputs, callbacks, metadata,
+# load properties). prefer sdl.mixer. C `bool` is u8 (nonzero is true),
+# `const char *` is *u8, mixers, audio, tracks, groups and decoders are ptr
+# (mixer.Mixer.handle and so on), and SDL_PropertiesID is u32. callback
+# parameters are plain ptr; pass nil.
 
 use sdl.c;
 use std.types.size.usize;
 use std.types.string.str;
 
-# MIX_StereoGains, transcribed field-for-field from SDL_mixer.h. two f32
-# fields (left, right): 4+4 = 8 bytes, no padding.
+# per-channel gains for MIX_SetTrackStereo
+# ---
+# left:  left channel gain, 1.0 unchanged
+# right: right channel gain, 1.0 unchanged
 pub rec StereoGains {
     left:  f32;
     right: f32;
@@ -48,8 +25,11 @@ test mix__stereogains_layout_is_8_bytes {
     ret 0;
 }
 
-# MIX_Point3D, transcribed field-for-field from SDL_mixer.h. three f32
-# fields (x, y, z): 4+4+4 = 12 bytes, no padding.
+# a 3D position for MIX_SetTrack3DPosition, see mixer.Position
+# ---
+# x: negative is left
+# y: negative is down
+# z: negative is in front
 pub rec Point3D {
     x: f32;
     y: f32;
@@ -63,9 +43,8 @@ test mix__point3d_layout_is_12_bytes {
 
 # --- property name strings ---
 #
-# passed to SDL_SetNumberProperty / SDL_SetBooleanProperty /
-# SDL_SetFloatProperty via sdl.c. values verified against SDL_mixer.h
-# release-3.2.4.
+# set with c.SDL_SetNumberProperty / SDL_SetBooleanProperty /
+# SDL_SetFloatProperty on an id from c.SDL_CreateProperties.
 
 # mixer properties
 pub val PROP_MIXER_DEVICE_NUMBER: str = "SDL_mixer.mixer.device";
