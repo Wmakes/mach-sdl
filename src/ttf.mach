@@ -15,8 +15,10 @@
 # a u32 whose little-endian bytes are r, g, b, a. every color parameter is
 # therefore declared u32 and packed by the idiomatic layer (sdl.font.pack).
 # this avoids relying on by-value rec passing in `ext fun`, which no other
-# binding in this project exercises. UNVERIFIED on aarch64 and darwin: all
-# declared targets in mach.toml are x86_64, where the argument above holds.
+# binding in this project exercises. UNVERIFIED beyond x86_64: every target
+# declared in mach.toml is x86_64 (SysV on linux and darwin, Win64 on
+# windows), where the argument above holds. an aarch64 target would need
+# this re-checked.
 #
 # text length: every render and measure function takes a `length`. 0 means
 # "the string is NUL-terminated, use strlen", which is what the idiomatic

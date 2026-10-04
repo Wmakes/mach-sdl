@@ -2,9 +2,10 @@
 #
 # a scancode names a physical key position, independent of keyboard layout.
 # use it against KeyEvent.scancode and is_down(); it is the right choice for
-# movement and action keys (WASD stays under the left hand on an AZERTY
-# board, for instance). values come from SDL_scancode.h and SDL_keycode.h
-# (SDL 3.2.x).
+# movement and action keys (the physical key where QWERTY has W is labelled
+# Z on an AZERTY board, so the scancode W keeps the movement cluster under
+# the left hand there, printed ZQSD). values come from SDL_scancode.h and
+# SDL_keycode.h (SDL 3.2.x).
 
 use sdl.c;
 use std.types.bool.bool;

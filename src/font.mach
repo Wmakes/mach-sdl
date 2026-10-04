@@ -296,7 +296,8 @@ pub fun family_name(fnt: Font) res[str, error.Error] {
     ret res[str, error.Error].ok{ s };
 }
 
-# the height of the font in pixels: the tallest line, ascent plus descent
+# the height of the font in pixels: the tallest line, the ascent plus the
+# size of the descent (the descent itself is negative, see descent)
 # ---
 # fnt: font to query
 # ret: the height, or an error.Error on failure

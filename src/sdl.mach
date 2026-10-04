@@ -1,8 +1,9 @@
 # the project entry point of the mach-sdl bindings
 #
-# re-exports only the shared Error tag, so consumers spell it sdl.Error
-# everywhere. every other API lives in its own module (sdl.window, sdl.event,
-# ...) and is imported explicitly by the code that uses it.
+# re-exports only the shared Error tag, so it is also reachable as
+# sdl.Error. the modules in this project import sdl.error and spell it
+# error.Error. every other API lives in its own module (sdl.window,
+# sdl.event, ...) and is imported explicitly by the code that uses it.
 
 use sdl.error;
 

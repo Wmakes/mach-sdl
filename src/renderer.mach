@@ -13,6 +13,7 @@ use sdl.error;
 use sdl.rect.FPoint;
 use sdl.rect.FRect;
 use sdl.rect.Rect;
+use sdl.surface;
 use sdl.window;
 use std.types.bool.bool;
 use std.types.error.err;
@@ -30,7 +31,8 @@ pub rec Renderer {
 #
 # defined here, not in sdl.texture, because mach refuses circular module
 # dependencies and drawing needs the type while sdl.texture needs Renderer.
-# sdl.texture re-exports it, so it is spelled texture.Texture everywhere.
+# sdl.texture re-exports it, so texture.Texture and renderer.Texture name the
+# same type.
 # ---
 # handle: opaque SDL_Texture pointer, nil when invalid
 pub rec Texture {
@@ -258,6 +260,27 @@ pub fun fill_rects(rend: Renderer, rects: *FRect, count: usize) err[error.Error]
     val r: err[error.Error] = ready(rend);
     if (!sel r.ok) { ret r; }
     ret to_err(c.SDL_RenderFillRects(rend.handle, rects::ptr, count::i32));
+}
+
+# copy the pixels of the current target into a new surface
+#
+# slow: it waits for the GPU. on the window's own target, call it after
+# drawing and before present(), or the result is not what was just drawn.
+# save it with image.save_png / image.save_jpg.
+# ---
+# rend: renderer to read from
+# ret:  the new Surface (destroy it with surface.destroy) holding the whole
+#       viewport, or error.Error.invalid for a nil renderer, or
+#       error.Error.failed (text from error.message())
+pub fun read_pixels(rend: Renderer) res[surface.Surface, error.Error] {
+    if (!is_valid(rend)) {
+        ret res[surface.Surface, error.Error].err{ error.Error.invalid{} };
+    }
+    val handle: ptr = c.SDL_RenderReadPixels(rend.handle, nil);
+    if (handle == nil) {
+        ret res[surface.Surface, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[surface.Surface, error.Error].ok{ surface.Surface{ handle: handle } };
 }
 
 # draw into a texture instead of the window. the texture must have been

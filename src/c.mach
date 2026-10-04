@@ -1,15 +1,22 @@
 # raw C-ABI imports of SDL 3.2
 #
 # every SDL function is a pub ext fun with its C name and C-faithful types,
-# transcribed directly from SDL3's own headers (SDL_init.h, SDL_video.h,
-# SDL_events.h, SDL_error.h -- release-3.2.0 tag). SDL3's `bool` is a real
+# transcribed directly from SDL3's own headers at the release-3.2.0 tag
+# (SDL_init.h, SDL_error.h, SDL_video.h, SDL_events.h, SDL_mouse.h,
+# SDL_keyboard.h, SDL_timer.h, SDL_rect.h, SDL_render.h, SDL_surface.h,
+# SDL_audio.h, SDL_clipboard.h, SDL_messagebox.h, SDL_blendmode.h,
+# SDL_stdinc.h, plus the SDL_iostream.h / SDL_filesystem.h glue SDL_image
+# needs at the end of this file). SDL3's `bool` is a real
 # C99 _Bool (1 byte), so every SDL bool-returning function is declared `u8`
 # here and unwrapped with `!= 0` in the idiomatic wrapper modules, the same
 # way mach-glfw unwraps GLFW's int-based booleans in its own core.mach.
 #
-# scope: init/quit, window, GL context, keyboard, mouse, timing, audio,
-# 2D renderer. gamepad/joystick support was removed. still deferred:
-# haptics, camera, sensors.
+# scope: init/quit, hints, window, GL context, events, keyboard, mouse,
+# text input, timing, rects, random numbers, the 2D renderer and textures,
+# clipboard, message boxes, audio (playback, device list, WAV). not bound:
+# gamepad, joystick, haptics, camera, sensors.
+
+use std.types.size.usize;
 
 # --- SDL_init.h ---
 
@@ -23,9 +30,9 @@ pub ext fun SDL_Init(flags: u32) u8;
 pub ext fun SDL_Quit();
 
 # hints -- SDL_SetHint("SDL_VIDEO_DRIVER", "dummy") forces the headless
-# video driver, which is what makes real (non-display-free) test blocks
-# possible below: no window server needed, but SDL_Init/SDL_CreateWindow/
-# SDL_DestroyWindow all genuinely run, not just get skipped.
+# video driver (see core.use_dummy_video), so SDL can run with no display
+# server. the test blocks in this file only check struct layouts and do not
+# call into SDL.
 #[library("sdl")]
 pub ext fun SDL_SetHint(name: *u8, value: *u8) u8;
 
@@ -366,9 +373,9 @@ pub ext fun SDL_LoadWAV(path: *u8, spec: *AudioSpec, audio_buf: *ptr, audio_len:
 #
 # just enough to draw a static image: load a BMP into a surface, upload
 # it to a texture, draw the texture, clean up. no procedural surface
-# creation, no pixel-level editing, no other image formats (those need
-# SDL_image, a separate library not bound here) -- deferred until
-# something needs them.
+# creation, no pixel-level editing. image formats other than BMP come
+# from SDL_image, a separate library bound in sdl.img. the rest is
+# deferred until something needs it.
 
 pub val TEXTUREACCESS_STATIC:    i32 = 0;
 pub val TEXTUREACCESS_STREAMING: i32 = 1;
@@ -409,7 +416,7 @@ pub val FLIP_VERTICAL:   u32 = 2;
 #
 # blend mode, color/alpha mod, and scale mode on individual textures.
 # these are independent of the renderer-level draw blend mode set by
-# set_blend_mode above.
+# SDL_SetRenderDrawBlendMode further down.
 
 #[library("sdl")]
 pub ext fun SDL_SetTextureBlendMode(texture: ptr, blend_mode: u32) u8;
@@ -443,6 +450,8 @@ pub ext fun SDL_SetWindowSize(window: ptr, w: i32, h: i32) u8;
 pub ext fun SDL_GetKeyboardState(numkeys: *i32) ptr;
 #[library("sdl")]
 pub ext fun SDL_GetModState() u16;
+# --- window position + fullscreen (SDL_video.h) ---
+
 #[library("sdl")]
 pub ext fun SDL_SetWindowPosition(window: ptr, x: i32, y: i32) u8;
 #[library("sdl")]
@@ -561,7 +570,7 @@ pub ext fun SDL_RenderFillRects(renderer: ptr, rects: ptr, count: i32) u8;
 # SDL_GetClipboardText allocates a fresh buffer on every call (unlike
 # SDL_GetError's reused thread-local buffer) -- the caller owns it and
 # must free it with SDL_free. Returns an empty string (never nil) on
-# failure too. See clipboard.mach's get_text/free_text.
+# failure too. See clipboard.mach's text/free_text.
 
 #[library("sdl")]
 pub ext fun SDL_SetClipboardText(text: *u8) u8;
@@ -603,3 +612,29 @@ pub ext fun SDL_RaiseWindow(window: ptr) u8;
 pub ext fun SDL_SetWindowMinimumSize(window: ptr, min_w: i32, min_h: i32) u8;
 #[library("sdl")]
 pub ext fun SDL_SetWindowMaximumSize(window: ptr, max_w: i32, max_h: i32) u8;
+
+# --- glue for SDL_image (SDL_iostream.h, SDL_filesystem.h, SDL_render.h) ---
+#
+# SDL_image loads from an SDL_IOStream. these make one from a file or from
+# a read-only block of memory, and close it again. SDL_IOStream is opaque
+# and held as ptr. SDL_IOFromConstMem does not copy: the memory must stay
+# alive and unchanged until the stream is closed. a stream handed to an
+# SDL_image loader with closeio true is closed by the loader, on failure too.
+#
+# SDL_RenderReadPixels returns a new surface (caller owns it, free with
+# SDL_DestroySurface) holding the target's pixels, or NULL on failure. a
+# nil rect reads the whole viewport. on the window's own target it must be
+# called after drawing and before SDL_RenderPresent.
+#
+# SDL_RemovePath deletes a file or empty directory. true on success.
+
+#[library("sdl")]
+pub ext fun SDL_IOFromFile(file: *u8, mode: *u8) ptr;
+#[library("sdl")]
+pub ext fun SDL_IOFromConstMem(mem: ptr, size: usize) ptr;
+#[library("sdl")]
+pub ext fun SDL_CloseIO(context: ptr) u8;
+#[library("sdl")]
+pub ext fun SDL_RenderReadPixels(renderer: ptr, rect: *Rect) ptr;
+#[library("sdl")]
+pub ext fun SDL_RemovePath(path: *u8) u8;

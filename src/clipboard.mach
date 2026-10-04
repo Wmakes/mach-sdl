@@ -44,8 +44,10 @@ pub fun set_text(text: str) err[error.Error] {
 # an empty clipboard gives an empty string, not an error. use has_text to
 # tell the two apart.
 # ---
-# ret: the text (SDL-allocated, caller must call free_text), or
-#      error.Error.failed (text from error.message())
+# ret: the text (SDL-allocated, caller must call free_text). SDL reports a
+#      failed read as an empty string, so it looks like an empty clipboard;
+#      error.Error.failed only comes back if SDL hands back no string at
+#      all (out of memory), text from error.message()
 pub fun text() res[str, error.Error] {
     val raw: *u8 = c.SDL_GetClipboardText();
     if (raw == nil) {

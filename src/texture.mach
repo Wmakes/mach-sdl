@@ -105,9 +105,9 @@ pub fun from_surface(rend: renderer.Renderer, surf: surface.Surface) res[Texture
 
 # load a BMP image file into a texture
 #
-# only BMP is supported: SDL3's core reads nothing else. other formats need
-# SDL_image, which is not bound here. SDL reads the file; the intermediate
-# surface is released before returning.
+# only BMP is supported here: the SDL 3.2 core reads nothing else. use
+# image.load_texture for every other format. SDL reads the file; the
+# intermediate surface is released before returning.
 # ---
 # rend: renderer that will own the texture
 # path: path to a .bmp file

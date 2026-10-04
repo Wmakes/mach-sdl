@@ -123,7 +123,7 @@ fun open_id(devid: u32, format: Format, channels: i32, freq: i32) res[Stream, er
 # open a stream bound to the default playback device. it starts paused
 # ---
 # format:   the sample format
-# channels: 1 (mono) or 2 (stereo)
+# channels: channel count, 1 (mono) or 2 (stereo) in practice
 # freq:     sample rate in Hz, e.g. 44100 or 48000
 # ret:      the new Stream, or error.Error.failed (text from error.message())
 pub fun open(format: Format, channels: i32, freq: i32) res[Stream, error.Error] {
@@ -134,7 +134,7 @@ pub fun open(format: Format, channels: i32, freq: i32) res[Stream, error.Error] 
 # ---
 # dev:      a device from playback_device
 # format:   the sample format
-# channels: 1 (mono) or 2 (stereo)
+# channels: channel count, 1 (mono) or 2 (stereo) in practice
 # freq:     sample rate in Hz
 # ret:      the new Stream, or error.Error.failed (text from error.message())
 pub fun open_on(dev: Device, format: Format, channels: i32, freq: i32) res[Stream, error.Error] {

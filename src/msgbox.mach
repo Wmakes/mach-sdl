@@ -1,6 +1,7 @@
 # native message boxes (sdl.msgbox)
 #
-# one-shot dialogs through the OS's own UI (Win32 MessageBox, NSAlert, GTK).
+# one-shot dialogs through the OS's own UI (Win32 MessageBox, NSAlert, and on
+# Linux zenity or SDL's own X11 / Wayland dialog).
 # useful for fatal errors or a confirmation where a terminal message would be
 # missed. blocks until the user clicks OK.
 

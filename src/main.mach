@@ -1,6 +1,7 @@
 # demo / smoke test for mach-sdl
 #
-# one run exercises every module of the bindings:
+# one run exercises every module of the bindings except sdl.wav (and the
+# device-list functions in sdl.audio):
 #
 #   core       init (video + audio), quit
 #   window     create (GL window and plain window), set_title, size,
@@ -11,7 +12,7 @@
 #              set_clip, draw_points, draw_lines, fill_rects in the second
 #              window; texture.load on a missing file shows the failure path
 #   event      poll() into the typed Event tag: keys, mouse, wheel, resize
-#   key        scancode constants: WASD, F, M, L, N, C, V, SPACE, ESC
+#   key        scancode constants: WASD, F, M, L, N, C, V, P, SPACE, ESC
 #   mouse      state() each frame, show / hide cursor (M), relative mode (L)
 #   timer      Clock / tick drives delta-time movement
 #   audio      open + put + resume: a square-wave beep on SPACE
@@ -24,12 +25,25 @@
 #              measure, set_style, render_texture / render_texture_wrapped:
 #              a live score label and a static help label in the renderer
 #              window
+#   image      version, load_texture on a missing file shows the failure
+#              path; with an image argument: detect, load_animation,
+#              animation_info / animation_frame_texture / animation_delay
+#              (GIF and WebP play in the renderer window, a still image is
+#              one frame); P takes a screenshot: renderer.read_pixels,
+#              save_png, save_jpg, then detect / load / load_texture them
+#              back and show the PNG as a thumbnail
 #
 # controls: WASD move, SPACE beep, M cursor, F fullscreen, L relative mouse,
-# N minimize / restore the renderer window, C copy, V paste, ESC quit.
+# N minimize / restore the renderer window, C copy, V paste, P screenshot,
+# ESC quit.
 #
 # font: pass a .ttf path as the first argument, otherwise a few common system
 # fonts are tried. with no usable font the demo runs without text.
+#
+# image: pass an image file (PNG, JPG, GIF, WebP, ...) as the second
+# argument. to give an image but use a system font, pass "-" as the font. the
+# screenshot is written to mach-sdl-shot.png and mach-sdl-shot.jpg in the
+# current directory.
 
 use std.runtime;
 use print: std.print;
@@ -50,12 +64,14 @@ use sdl.error;
 use sdl.event;
 use sdl.font;
 use sdl.gl;
+use sdl.image;
 use sdl.key;
 use sdl.mouse;
 use sdl.msgbox;
 use sdl.rand;
 use sdl.rect;
 use sdl.renderer;
+use sdl.surface;
 use sdl.texture;
 use sdl.timer;
 use sdl.window;
@@ -176,6 +192,73 @@ fun open_any_font(size: f32) res[font.Font, error.Error] {
     ret font.open("/System/Library/Fonts/Supplemental/Arial.ttf", size);
 }
 
+# scale a w x h image to fit a square box, keeping its aspect ratio
+fun fit(w: f32, h: f32, box: f32, x: f32, y: f32) rect.FRect {
+    if (w <= 0.0 || h <= 0.0) {
+        ret rect.FRect{ x: x, y: y, w: box, h: box };
+    }
+    var s: f32 = box / w;
+    if (box / h < s) { s = box / h; }
+    ret rect.FRect{ x: x, y: y, w: w * s, h: h * s };
+}
+
+# upload frame `index` of an animation. a nil-handle texture on failure
+fun frame_texture(rend: renderer.Renderer, anim: image.Animation, index: i32) renderer.Texture {
+    val made: res[texture.Texture, error.Error] = image.animation_frame_texture(rend, anim, index);
+    if (sel made.ok) { ret made.ok; }
+    print.eprint("animation frame failed: ");
+    print.eprintln(error.message());
+    ret renderer.Texture{ handle: nil };
+}
+
+# P: save the renderer window as PNG and JPG, then read both back to check
+# the round trip. call after drawing and before present. returns the PNG as
+# a texture, a nil-handle texture on failure
+fun screenshot(rend: renderer.Renderer) renderer.Texture {
+    val none: renderer.Texture = renderer.Texture{ handle: nil };
+    val grabbed: res[surface.Surface, error.Error] = renderer.read_pixels(rend);
+    if (sel grabbed.err) {
+        print.eprint("screenshot: read_pixels failed: ");
+        print.eprintln(error.message());
+        ret none;
+    }
+    val png_saved: err[error.Error] = image.save_png(grabbed.ok, "mach-sdl-shot.png");
+    if (sel png_saved.err) {
+        print.eprint("screenshot: save_png failed: ");
+        print.eprintln(error.message());
+    }
+    val jpg_saved: err[error.Error] = image.save_jpg(grabbed.ok, "mach-sdl-shot.jpg", 90);
+    if (sel jpg_saved.err) {
+        print.eprint("screenshot: save_jpg failed: ");
+        print.eprintln(error.message());
+    }
+    surface.destroy(grabbed.ok);
+    if (sel png_saved.err) { ret none; }
+
+    val png_kind: res[image.Format, error.Error] = image.detect("mach-sdl-shot.png");
+    if (sel png_kind.ok) { print.printf("screenshot: mach-sdl-shot.png is {}\n", image.format_name(png_kind.ok)); }
+    val jpg_kind: res[image.Format, error.Error] = image.detect("mach-sdl-shot.jpg");
+    if (sel jpg_kind.ok) { print.printf("screenshot: mach-sdl-shot.jpg is {}\n", image.format_name(jpg_kind.ok)); }
+    val jpg_back: res[surface.Surface, error.Error] = image.load("mach-sdl-shot.jpg");
+    if (sel jpg_back.ok) {
+        print.println("screenshot: jpg loads back ok");
+        surface.destroy(jpg_back.ok);
+    } or {
+        print.eprint("screenshot: jpg reload failed: ");
+        print.eprintln(error.message());
+    }
+
+    val back: res[texture.Texture, error.Error] = image.load_texture(rend, "mach-sdl-shot.png");
+    if (sel back.ok) {
+        val sz: res[texture.Size, error.Error] = texture.size(back.ok);
+        if (sel sz.ok) { print.printf("screenshot: png loads back as {}x{}\n", sz.ok.w::i64, sz.ok.h::i64); }
+        ret back.ok;
+    }
+    print.eprint("screenshot: png reload failed: ");
+    print.eprintln(error.message());
+    ret none;
+}
+
 #[symbol("main")]
 fun main(argc: i64, argv: **u8) i64 {
     val started: err[error.Error] = core.init(core.VIDEO | core.AUDIO);
@@ -280,6 +363,62 @@ fun main(argc: i64, argv: **u8) i64 {
     var beep: [2400]u8;
     fill_beep(?beep[0]);
 
+    # --- images (SDL3_image) ---
+    print.printf("SDL3_image version: {}\n", image.version());
+
+    # no such file, so this must fail cleanly: the error path of image.load_texture
+    val bad_img: res[texture.Texture, error.Error] = image.load_texture(rend, "nonexistent.png");
+    if (sel bad_img.err) {
+        print.println("image load (expected failure): ok, no crash, error reported cleanly");
+    }
+    if (sel bad_img.ok) {
+        texture.destroy(bad_img.ok);
+    }
+
+    var anim:       image.Animation  = image.Animation{ handle: nil };
+    var anim_tex:   renderer.Texture = renderer.Texture{ handle: nil };
+    var anim_w:     f32 = 0.0;
+    var anim_h:     f32 = 0.0;
+    var anim_count: i32 = 0;
+    var anim_index: i32 = 0;
+    var anim_delay: i32 = 100;
+    var anim_wait:  f64 = 0.0;
+    var shot_tex:   renderer.Texture = renderer.Texture{ handle: nil };
+    var want_shot:  bool = false;
+
+    if (argc > 2) {
+        val kind: res[image.Format, error.Error] = image.detect(argv[2]);
+        if (sel kind.ok) {
+            print.printf("image format: {}\n", image.format_name(kind.ok));
+        } or {
+            print.eprint("image detect failed: ");
+            print.eprintln(error.message());
+        }
+
+        val loaded: res[image.Animation, error.Error] = image.load_animation(argv[2]);
+        if (sel loaded.ok) {
+            anim = loaded.ok;
+            val info: res[image.AnimationInfo, error.Error] = image.animation_info(anim);
+            if (sel info.ok) {
+                anim_w = info.ok.w::f32;
+                anim_h = info.ok.h::f32;
+                anim_count = info.ok.count;
+                print.printf("image: {}x{}, {} frame(s)\n", info.ok.w, info.ok.h, info.ok.count);
+            }
+            anim_tex = frame_texture(rend, anim, 0);
+            val d0: res[i32, error.Error] = image.animation_delay(anim, 0);
+            if (sel d0.ok) {
+                anim_delay = d0.ok;
+                if (anim_delay < 10) { anim_delay = 10; }
+            }
+        } or {
+            print.eprint("image load failed: ");
+            print.eprintln(error.message());
+        }
+    } or {
+        print.println("(pass an image file as the second argument)");
+    }
+
     # --- text (SDL3_ttf) ---
     var have_ttf:  bool = false;
     var have_font: bool = false;
@@ -308,7 +447,7 @@ fun main(argc: i64, argv: **u8) i64 {
         }
 
         var font_res: res[font.Font, error.Error];
-        if (argc > 1) {
+        if (argc > 1 && argv[1][0] != 45) {
             font_res = font.open(argv[1], 20.0);
         } or {
             font_res = open_any_font(20.0);
@@ -358,6 +497,7 @@ fun main(argc: i64, argv: **u8) i64 {
     print.println("");
     print.println("WASD=move  SPACE=beep  M=cursor  F=fullscreen  ESC=quit");
     print.println("L=relative mouse  N=minimize renderer window  C=copy clipboard  V=paste clipboard");
+    print.println("P=screenshot of the renderer window (mach-sdl-shot.png / .jpg)");
     print.println("collect the green square to score a point");
     print.println("");
 
@@ -440,6 +580,9 @@ fun main(argc: i64, argv: **u8) i64 {
                 or (kd.scancode == key.C && fresh) {
                     clipboard.set_text("mach-sdl clipboard demo");
                     print.println("clipboard: copied demo string");
+                }
+                or (kd.scancode == key.P && fresh) {
+                    want_shot = true;
                 }
                 or (kd.scancode == key.V && fresh) {
                     val pasted: res[str, error.Error] = clipboard.text();
@@ -526,6 +669,25 @@ fun main(argc: i64, argv: **u8) i64 {
                 print.eprintln(error.message());
             }
             shown_score = score;
+        }
+
+        # step the animation by wall time
+        if (anim_count > 1) {
+            anim_wait = anim_wait + dt * 1000.0;
+            if (anim_wait >= (anim_delay::f64)) {
+                anim_wait = 0.0;
+                anim_index = (anim_index + 1) % anim_count;
+                val next_tex: renderer.Texture = frame_texture(rend, anim, anim_index);
+                if (texture.is_valid(next_tex)) {
+                    texture.destroy(anim_tex);
+                    anim_tex = next_tex;
+                }
+                val dn: res[i32, error.Error] = image.animation_delay(anim, anim_index);
+                if (sel dn.ok) {
+                    anim_delay = dn.ok;
+                    if (anim_delay < 10) { anim_delay = 10; }
+                }
+            }
         }
 
         print_accum = print_accum + dt;
@@ -638,6 +800,23 @@ fun main(argc: i64, argv: **u8) i64 {
             renderer.draw_texture(rend, help_tex, rect.FRect{ x: 150.0, y: 40.0, w: help_w, h: help_h });
         }
 
+        # images: the loaded image or animation, and the last screenshot thumbnail
+        if (texture.is_valid(anim_tex)) {
+            renderer.draw_texture(rend, anim_tex, fit(anim_w, anim_h, 120.0, 165.0, 135.0));
+        }
+        if (texture.is_valid(shot_tex)) {
+            renderer.draw_texture(rend, shot_tex, rect.FRect{ x: 20.0, y: 160.0, w: 100.0, h: 100.0 });
+        }
+
+        if (want_shot) {
+            want_shot = false;
+            val shot: renderer.Texture = screenshot(rend);
+            if (texture.is_valid(shot)) {
+                texture.destroy(shot_tex);
+                shot_tex = shot;
+            }
+        }
+
         renderer.present(rend);
     }
 
@@ -648,6 +827,9 @@ fun main(argc: i64, argv: **u8) i64 {
     if (have_audio)    { audio.close(beep_stream); }
     texture.destroy(score_tex);
     texture.destroy(help_tex);
+    texture.destroy(anim_tex);
+    texture.destroy(shot_tex);
+    image.destroy_animation(anim);
     font.close(fnt);
     if (have_ttf)      { font.quit(); }
     renderer.destroy(rend);

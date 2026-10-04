@@ -2,11 +2,12 @@
 #
 # a Surface is a by-value handle around SDL_Surface, a block of pixels in
 # memory. it is the stage between an image file and a Texture: SDL reads the
-# file, the binding only passes the parameters. every fallible function
-# checks its handle first and returns error.Error.invalid for a nil one.
+# file, the binding only passes the parameters.
 #
-# only BMP is read, because SDL3's core reads nothing else. other formats
-# need SDL_image, which is not bound here.
+# load_bmp reads only BMP, because the SDL 3.2 core reads nothing else (SDL
+# 3.4 adds PNG loading to the core; this binding targets 3.2.0 and does not
+# bind it). every other format loads through sdl.image (SDL3_image), which
+# also saves.
 
 use sdl.c;
 use sdl.error;

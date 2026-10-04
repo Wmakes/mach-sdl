@@ -1,12 +1,12 @@
 # mach-sdl
 
-[SDL3](https://github.com/libsdl-org/SDL) (and, technically, [SDL3_ttf](https://github.com/libsdl-org/SDL_ttf) ) bindings for the [mach](https://github.com/briar-systems/mach) programming language.
+[SDL3](https://github.com/libsdl-org/SDL) (and, technically, [SDL3_ttf](https://github.com/libsdl-org/SDL_ttf) and [SDL3_image](https://github.com/libsdl-org/SDL_image) ) bindings for the [mach](https://github.com/briar-systems/mach) programming language.
 
 ## Requirements
 
 * A mach compiler matching the required version range (`mach info` prints your version).
-* **Linux:** The SDL3 development files, so that `libSDL3.so` and  `libSDL3_ttf.so`  (not just `libSDL3.so.0` and `libSDL3_ttf.so.0` ) are available in a standard library directory such as `/usr/lib` or `/usr/lib/<arch>-linux-gnu`.
-* **Windows:** After building your `.exe`, you need to manually copy `SDL3.dll`  and `SDL3_ttf.dll` into the same directory as the executable.
+* **Linux:** The SDL3 development files, so that `libSDL3.so`, `libSDL3_ttf.so` and `libSDL3_image.so` (not just `libSDL3.so.0`, `libSDL3_ttf.so.0` and `libSDL3_image.so.0` ) are available in a standard library directory such as `/usr/lib` or `/usr/lib/<arch>-linux-gnu`.
+* **Windows:** After building your `.exe`, you need to manually copy `SDL3.dll`, `SDL3_ttf.dll` and `SDL3_image.dll` into the same directory as the executable.
 
 ## Status
 

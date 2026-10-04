@@ -1,6 +1,6 @@
 [project]
 id = "sdl"
-version = "0.7.0"
+version = "0.8.0"
 src = "src"
 out = "out/{target.name}/{profile.name}"
 mach = ">=6.0"
@@ -42,7 +42,7 @@ kind    = "bin"
 entry   = "main.mach"
 out     = "bin/demo{artifact.suffix}"
 targets = ["*"]
-link    = ["sdl", "sdl-win", "sdl-ttf", "sdl-ttf-win"]
+link    = ["sdl", "sdl-win", "sdl-ttf", "sdl-ttf-win", "sdl-image", "sdl-image-win"]
 need    = []
 
 [link.sdl]
@@ -76,6 +76,24 @@ export  = true
 source  = "system"
 name    = "SDL3_ttf.dll"
 library = "sdl-ttf"
+os      = ["windows"]
+isa     = "*"
+abi     = "*"
+export  = true
+
+[link.sdl-image]
+source  = "system"
+name    = "SDL3_image"
+library = "sdl-image"
+os      = ["linux", "darwin"]
+isa     = "*"
+abi     = "*"
+export  = true
+
+[link.sdl-image-win]
+source  = "system"
+name    = "SDL3_image.dll"
+library = "sdl-image"
 os      = ["windows"]
 isa     = "*"
 abi     = "*"

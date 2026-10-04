@@ -1,0 +1,521 @@
+# image loading and saving (sdl.image)
+#
+# wraps SDL3_image, a separate library from SDL3 itself. it reads PNG, JPG,
+# GIF, WebP, AVIF, JXL, QOI, TIF, BMP, SVG, TGA, ICO, CUR, PCX, PNM, LBM, XCF,
+# XPM and XV, and writes PNG, JPG and AVIF. there is nothing to initialize.
+# every format except TGA is detected from the file's contents, not its name.
+# TGA has no signature: load() takes it from the file extension, and
+# load_mem_as() needs Format.tga.
+#
+# which formats actually decode depends on how the installed SDL3_image was
+# built. a build without WebP support, say, fails on a WebP file with
+# error.Error.failed and the library's own text from error.message().
+#
+# failures are reported as error.Error; the text is read with
+# error.message() right after the failing call. a nil handle is rejected as
+# error.Error.invalid before SDL is called.
+#
+# typical use:
+#
+#   val tex = image.load_texture(rend, "player.png");
+#   ...draw tex with renderer.draw_texture, size it with texture.size...
+#   texture.destroy(tex.ok);
+#
+# animations load through image.load_animation, which accepts any image
+# (a still image is an animation of one frame):
+#
+#   val anim = image.load_animation("spin.gif");
+#   val frame = image.animation_frame_texture(rend, anim.ok, 0);
+#   val wait = image.animation_delay(anim.ok, 0);
+#   image.destroy_animation(anim.ok);
+#
+# memory loaders take a pointer and a byte count. the memory is only read
+# during the call.
+
+use sdl.c;
+use sdl.error;
+use sdl.img;
+use sdl.renderer;
+use sdl.surface;
+use sdl.texture;
+use std.types.bool.bool;
+use std.types.error.err;
+use std.types.result.res;
+use std.types.size.usize;
+use std.types.string.str;
+
+# the image formats SDL3_image knows
+# ---
+# unknown: detect() recognised none of them
+# tga:     never returned by detect(), TGA has no signature. a type hint only
+# the rest are named for their file extension
+pub tag Format: u8 {
+    unknown;
+    avif;
+    bmp;
+    cur;
+    gif;
+    ico;
+    jpg;
+    jxl;
+    lbm;
+    pcx;
+    png;
+    pnm;
+    qoi;
+    svg;
+    tga;
+    tif;
+    webp;
+    xcf;
+    xpm;
+    xv;
+}
+
+# handle to a loaded animation: its frames and their delays. the zero value
+# (nil handle) is invalid
+# ---
+# handle: opaque IMG_Animation pointer, nil when invalid
+pub rec Animation {
+    handle: ptr;
+}
+
+# the shape of an animation
+# ---
+# w:     width of every frame in pixels
+# h:     height of every frame in pixels
+# count: number of frames, at least 1
+pub rec AnimationInfo {
+    w:     i32;
+    h:     i32;
+    count: i32;
+}
+
+# turn an SDL bool result into err[error.Error]
+# ---
+# succeeded: the u8 result of an SDL call, nonzero on success
+fun to_err(succeeded: u8) err[error.Error] {
+    if (succeeded == 0) {
+        ret err[error.Error].err{ error.Error.failed{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# wrap a raw surface pointer from an IMG_Load* call
+# ---
+# handle: surface pointer, nil when SDL3_image failed
+fun surface_result(handle: ptr) res[surface.Surface, error.Error] {
+    if (handle == nil) {
+        ret res[surface.Surface, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[surface.Surface, error.Error].ok{ surface.Surface{ handle: handle } };
+}
+
+# wrap a raw texture pointer from an IMG_LoadTexture* call
+# ---
+# handle: texture pointer, nil when SDL3_image failed
+fun texture_result(handle: ptr) res[texture.Texture, error.Error] {
+    if (handle == nil) {
+        ret res[texture.Texture, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[texture.Texture, error.Error].ok{ renderer.Texture{ handle: handle } };
+}
+
+# wrap a raw animation pointer from an IMG_LoadAnimation* call
+# ---
+# raw: animation pointer, nil when SDL3_image failed
+fun animation_result(raw: *img.Animation) res[Animation, error.Error] {
+    if (raw == nil) {
+        ret res[Animation, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Animation, error.Error].ok{ Animation{ handle: raw::ptr } };
+}
+
+# a read-only stream over a block of memory, nil for a nil or empty block
+# ---
+# data: first byte
+# size: byte count
+fun stream_of(data: *u8, size: usize) ptr {
+    if (data == nil) { ret nil; }
+    if (size == 0)   { ret nil; }
+    ret c.SDL_IOFromConstMem(data::ptr, size);
+}
+
+# the upper-case name of a Format, such as "PNG". Format.unknown is "UNKNOWN".
+# this is also the type hint string load_mem_as passes, where only "TGA"
+# changes anything
+# ---
+# fmt: the format to name
+pub fun format_name(fmt: Format) str {
+    if (sel fmt.avif) { ret "AVIF"; }
+    if (sel fmt.bmp)  { ret "BMP"; }
+    if (sel fmt.cur)  { ret "CUR"; }
+    if (sel fmt.gif)  { ret "GIF"; }
+    if (sel fmt.ico)  { ret "ICO"; }
+    if (sel fmt.jpg)  { ret "JPG"; }
+    if (sel fmt.jxl)  { ret "JXL"; }
+    if (sel fmt.lbm)  { ret "LBM"; }
+    if (sel fmt.pcx)  { ret "PCX"; }
+    if (sel fmt.png)  { ret "PNG"; }
+    if (sel fmt.pnm)  { ret "PNM"; }
+    if (sel fmt.qoi)  { ret "QOI"; }
+    if (sel fmt.svg)  { ret "SVG"; }
+    if (sel fmt.tga)  { ret "TGA"; }
+    if (sel fmt.tif)  { ret "TIF"; }
+    if (sel fmt.webp) { ret "WEBP"; }
+    if (sel fmt.xcf)  { ret "XCF"; }
+    if (sel fmt.xpm)  { ret "XPM"; }
+    if (sel fmt.xv)   { ret "XV"; }
+    ret "UNKNOWN";
+}
+
+# keep a save quality inside the 0 to 100 range SDL3_image documents
+# ---
+# quality: the caller's value
+fun clamp_quality(quality: i32) i32 {
+    if (quality < 0)   { ret 0; }
+    if (quality > 100) { ret 100; }
+    ret quality;
+}
+
+# the SDL3_image version this binding is linked against, as one integer
+# (major * 1000000 + minor * 1000 + patch)
+# ---
+# ret: the packed version number
+pub fun version() i32 {
+    ret img.IMG_Version();
+}
+
+# --- loading ---
+
+# load an image file into a surface, whatever its format
+# ---
+# path: path to the image file
+# ret:  the new Surface (destroy it with surface.destroy), or
+#       error.Error.failed (text from error.message())
+pub fun load(path: str) res[surface.Surface, error.Error] {
+    ret surface_result(img.IMG_Load(path));
+}
+
+# load an image file straight into a texture, whatever its format
+#
+# this skips the surface a load() plus texture.from_surface() would keep.
+# ---
+# rend: renderer that will own the texture
+# path: path to the image file
+# ret:  the new Texture, or error.Error.invalid for a nil renderer, or
+#       error.Error.failed (text from error.message())
+pub fun load_texture(rend: renderer.Renderer, path: str) res[texture.Texture, error.Error] {
+    if (!renderer.is_valid(rend)) {
+        ret res[texture.Texture, error.Error].err{ error.Error.invalid{} };
+    }
+    ret texture_result(img.IMG_LoadTexture(rend.handle, path));
+}
+
+# load an image held in memory into a surface
+# ---
+# data: first byte of the encoded image (the file's bytes, not pixels)
+# size: byte count
+# ret:  the new Surface, or error.Error.invalid for a nil or empty block, or
+#       error.Error.failed (text from error.message())
+pub fun load_mem(data: *u8, size: usize) res[surface.Surface, error.Error] {
+    val stream: ptr = stream_of(data, size);
+    if (stream == nil) {
+        ret res[surface.Surface, error.Error].err{ error.Error.invalid{} };
+    }
+    ret surface_result(img.IMG_Load_IO(stream, 1));
+}
+
+# load an image held in memory with a type hint. only Format.tga matters:
+# every other format is detected from the data
+# ---
+# data: first byte of the encoded image
+# size: byte count
+# fmt:  the format to assume if the data carries no signature
+# ret:  the new Surface, or error.Error.invalid for a nil or empty block, or
+#       error.Error.failed (text from error.message())
+pub fun load_mem_as(data: *u8, size: usize, fmt: Format) res[surface.Surface, error.Error] {
+    val stream: ptr = stream_of(data, size);
+    if (stream == nil) {
+        ret res[surface.Surface, error.Error].err{ error.Error.invalid{} };
+    }
+    ret surface_result(img.IMG_LoadTyped_IO(stream, 1, format_name(fmt)));
+}
+
+# load an image held in memory straight into a texture
+# ---
+# rend: renderer that will own the texture
+# data: first byte of the encoded image
+# size: byte count
+# ret:  the new Texture, or error.Error.invalid for a nil renderer or a nil
+#       or empty block, or error.Error.failed (text from error.message())
+pub fun load_texture_mem(rend: renderer.Renderer, data: *u8, size: usize) res[texture.Texture, error.Error] {
+    if (!renderer.is_valid(rend)) {
+        ret res[texture.Texture, error.Error].err{ error.Error.invalid{} };
+    }
+    val stream: ptr = stream_of(data, size);
+    if (stream == nil) {
+        ret res[texture.Texture, error.Error].err{ error.Error.invalid{} };
+    }
+    ret texture_result(img.IMG_LoadTexture_IO(rend.handle, stream, 1));
+}
+
+# rasterize an SVG file into a surface at a chosen size
+# ---
+# path:   path to the .svg file
+# width:  target width in pixels
+# height: target height in pixels
+#         give one and leave the other 0 to keep the SVG's aspect ratio.
+#         give both and the SVG is scaled to fit inside that box, keeping
+#         its aspect ratio, so one side can come out smaller than asked.
+#         both 0 uses the SVG's own size
+# ret:    the new Surface, or error.Error.failed (text from error.message())
+pub fun load_svg_sized(path: str, width: i32, height: i32) res[surface.Surface, error.Error] {
+    val stream: ptr = c.SDL_IOFromFile(path, "rb");
+    if (stream == nil) {
+        ret res[surface.Surface, error.Error].err{ error.Error.failed{} };
+    }
+    val loaded: ptr = img.IMG_LoadSizedSVG_IO(stream, width, height);
+    c.SDL_CloseIO(stream);
+    ret surface_result(loaded);
+}
+
+# --- detecting the format ---
+
+# the Format of the data in an open stream. the stream position is restored
+# ---
+# stream: a live SDL_IOStream
+fun detect_stream(stream: ptr) Format {
+    if (img.IMG_isAVIF(stream) != 0) { ret Format.avif{}; }
+    if (img.IMG_isCUR(stream) != 0)  { ret Format.cur{}; }
+    if (img.IMG_isICO(stream) != 0)  { ret Format.ico{}; }
+    if (img.IMG_isBMP(stream) != 0)  { ret Format.bmp{}; }
+    if (img.IMG_isGIF(stream) != 0)  { ret Format.gif{}; }
+    if (img.IMG_isJPG(stream) != 0)  { ret Format.jpg{}; }
+    if (img.IMG_isJXL(stream) != 0)  { ret Format.jxl{}; }
+    if (img.IMG_isLBM(stream) != 0)  { ret Format.lbm{}; }
+    if (img.IMG_isPCX(stream) != 0)  { ret Format.pcx{}; }
+    if (img.IMG_isPNG(stream) != 0)  { ret Format.png{}; }
+    if (img.IMG_isPNM(stream) != 0)  { ret Format.pnm{}; }
+    if (img.IMG_isSVG(stream) != 0)  { ret Format.svg{}; }
+    if (img.IMG_isTIF(stream) != 0)  { ret Format.tif{}; }
+    if (img.IMG_isXCF(stream) != 0)  { ret Format.xcf{}; }
+    if (img.IMG_isXPM(stream) != 0)  { ret Format.xpm{}; }
+    if (img.IMG_isXV(stream) != 0)   { ret Format.xv{}; }
+    if (img.IMG_isWEBP(stream) != 0) { ret Format.webp{}; }
+    if (img.IMG_isQOI(stream) != 0)  { ret Format.qoi{}; }
+    ret Format.unknown{};
+}
+
+# find out what format a file is, from its contents
+# ---
+# path: path to the file
+# ret:  the Format (Format.unknown when none matched, and always for TGA), or
+#       error.Error.failed if the file cannot be opened
+pub fun detect(path: str) res[Format, error.Error] {
+    val stream: ptr = c.SDL_IOFromFile(path, "rb");
+    if (stream == nil) {
+        ret res[Format, error.Error].err{ error.Error.failed{} };
+    }
+    val found: Format = detect_stream(stream);
+    c.SDL_CloseIO(stream);
+    ret res[Format, error.Error].ok{ found };
+}
+
+# find out what format a block of memory is, from its contents
+# ---
+# data: first byte
+# size: byte count
+# ret:  the Format (Format.unknown when none matched, and always for TGA), or
+#       error.Error.invalid for a nil or empty block
+pub fun detect_mem(data: *u8, size: usize) res[Format, error.Error] {
+    val stream: ptr = stream_of(data, size);
+    if (stream == nil) {
+        ret res[Format, error.Error].err{ error.Error.invalid{} };
+    }
+    val found: Format = detect_stream(stream);
+    c.SDL_CloseIO(stream);
+    ret res[Format, error.Error].ok{ found };
+}
+
+# --- saving ---
+
+# save a surface as a PNG file (lossless). an existing file is overwritten
+# ---
+# surf: surface to save
+# path: file to write
+pub fun save_png(surf: surface.Surface, path: str) err[error.Error] {
+    if (!surface.is_valid(surf)) {
+        ret err[error.Error].err{ error.Error.invalid{} };
+    }
+    ret to_err(img.IMG_SavePNG(surf.handle, path));
+}
+
+# save a surface as a JPEG file. an existing file is overwritten
+# ---
+# surf:    surface to save
+# path:    file to write
+# quality: 0 to 100, clamped. 0 to 33 is lowest, 34 to 66 middle, 67 to 100
+#          highest
+pub fun save_jpg(surf: surface.Surface, path: str, quality: i32) err[error.Error] {
+    if (!surface.is_valid(surf)) {
+        ret err[error.Error].err{ error.Error.invalid{} };
+    }
+    ret to_err(img.IMG_SaveJPG(surf.handle, path, clamp_quality(quality)));
+}
+
+# save a surface as an AVIF file. an existing file is overwritten. fails
+# with error.Error.failed when the installed SDL3_image has no AVIF support
+# ---
+# surf:    surface to save
+# path:    file to write
+# quality: 0 (lowest) to 100 (highest), clamped
+pub fun save_avif(surf: surface.Surface, path: str, quality: i32) err[error.Error] {
+    if (!surface.is_valid(surf)) {
+        ret err[error.Error].err{ error.Error.invalid{} };
+    }
+    ret to_err(img.IMG_SaveAVIF(surf.handle, path, clamp_quality(quality)));
+}
+
+# --- animations ---
+
+# whether an Animation holds a live handle
+# ---
+# anim: animation to test
+# ret:  true if the handle is non-nil
+pub fun is_animation_valid(anim: Animation) bool {
+    ret anim.handle != nil;
+}
+
+# reject a nil animation before SDL3_image is read
+# ---
+# anim: animation the caller is about to use
+fun animation_ready(anim: Animation) err[error.Error] {
+    if (!is_animation_valid(anim)) {
+        ret err[error.Error].err{ error.Error.invalid{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# load an animated image (GIF, WebP and the other animated formats the
+# installed SDL3_image reads) from a file. any still image loads too, as an
+# animation of one frame
+# ---
+# path: path to the image file
+# ret:  the new Animation (free it with destroy_animation), or
+#       error.Error.failed (text from error.message())
+pub fun load_animation(path: str) res[Animation, error.Error] {
+    ret animation_result(img.IMG_LoadAnimation(path));
+}
+
+# load an animated image held in memory
+# ---
+# data: first byte of the encoded image
+# size: byte count
+# ret:  the new Animation, or error.Error.invalid for a nil or empty block,
+#       or error.Error.failed (text from error.message())
+pub fun load_animation_mem(data: *u8, size: usize) res[Animation, error.Error] {
+    val stream: ptr = stream_of(data, size);
+    if (stream == nil) {
+        ret res[Animation, error.Error].err{ error.Error.invalid{} };
+    }
+    ret animation_result(img.IMG_LoadAnimation_IO(stream, 1));
+}
+
+# free an animation and every frame surface in it. safe on an invalid
+# handle. surfaces from animation_frame become invalid with it; textures made
+# from them stay valid
+# ---
+# anim: animation to free
+pub fun destroy_animation(anim: Animation) {
+    if (is_animation_valid(anim)) {
+        img.IMG_FreeAnimation(anim.handle::*img.Animation);
+    }
+}
+
+# the size and frame count of an animation
+# ---
+# anim: animation to query
+# ret:  the shape, or an error.Error on failure
+pub fun animation_info(anim: Animation) res[AnimationInfo, error.Error] {
+    val r: err[error.Error] = animation_ready(anim);
+    if (sel r.err) { ret res[AnimationInfo, error.Error].err{ r.err }; }
+    val raw: *img.Animation = anim.handle::*img.Animation;
+    val a: img.Animation = @raw;
+    ret res[AnimationInfo, error.Error].ok{ AnimationInfo{ w: a.w, h: a.h, count: a.count } };
+}
+
+# one frame of an animation as a surface
+#
+# the surface belongs to the animation: do NOT surface.destroy it. it is
+# valid until destroy_animation.
+# ---
+# anim:  animation to read
+# index: frame number, 0 up to count - 1
+# ret:   the frame, or error.Error.invalid for a nil animation or an index
+#        out of range
+pub fun animation_frame(anim: Animation, index: i32) res[surface.Surface, error.Error] {
+    val r: err[error.Error] = animation_ready(anim);
+    if (sel r.err) { ret res[surface.Surface, error.Error].err{ r.err }; }
+    val raw: *img.Animation = anim.handle::*img.Animation;
+    val a: img.Animation = @raw;
+    if (index < 0 || index >= a.count) {
+        ret res[surface.Surface, error.Error].err{ error.Error.invalid{} };
+    }
+    val stride: usize = $size_of(ptr);
+    val slot: *ptr = ((a.frames::usize + (index::usize) * stride)::*ptr);
+    ret res[surface.Surface, error.Error].ok{ surface.Surface{ handle: slot[0] } };
+}
+
+# how long a frame is shown, in milliseconds
+# ---
+# anim:  animation to read
+# index: frame number, 0 up to count - 1
+# ret:   the delay, or error.Error.invalid for a nil animation or an index
+#        out of range
+pub fun animation_delay(anim: Animation, index: i32) res[i32, error.Error] {
+    val r: err[error.Error] = animation_ready(anim);
+    if (sel r.err) { ret res[i32, error.Error].err{ r.err }; }
+    val raw: *img.Animation = anim.handle::*img.Animation;
+    val a: img.Animation = @raw;
+    if (index < 0 || index >= a.count) {
+        ret res[i32, error.Error].err{ error.Error.invalid{} };
+    }
+    val stride: usize = $size_of(i32);
+    val slot: *i32 = ((a.delays::usize + (index::usize) * stride)::*i32);
+    ret res[i32, error.Error].ok{ slot[0] };
+}
+
+# upload one frame of an animation to a new texture. the animation stays
+# alive and owned by the caller
+# ---
+# rend:  renderer that will own the texture
+# anim:  animation to read
+# index: frame number, 0 up to count - 1
+# ret:   the new Texture, or error.Error.invalid for a nil renderer or
+#        animation or an index out of range, or error.Error.failed
+pub fun animation_frame_texture(rend: renderer.Renderer, anim: Animation, index: i32) res[texture.Texture, error.Error] {
+    val frame: res[surface.Surface, error.Error] = animation_frame(anim, index);
+    if (sel frame.err) { ret res[texture.Texture, error.Error].err{ frame.err }; }
+    ret texture.from_surface(rend, frame.ok);
+}
+
+test image__invalid_inputs_rejected {
+    val nil_surf: surface.Surface = surface.Surface{ handle: nil };
+    val saved: err[error.Error] = save_png(nil_surf, "unused.png");
+    if (!sel saved.err) { ret 1; }
+    val nil_anim: Animation = Animation{ handle: nil };
+    if (is_animation_valid(nil_anim)) { ret 2; }
+    val info: res[AnimationInfo, error.Error] = animation_info(nil_anim);
+    if (!sel info.err) { ret 3; }
+    val empty: res[surface.Surface, error.Error] = load_mem(nil, 0);
+    if (!sel empty.err) { ret 4; }
+    ret 0;
+}
+
+test image__quality_is_clamped {
+    if (clamp_quality(0 - 5) != 0)   { ret 1; }
+    if (clamp_quality(50) != 50)     { ret 2; }
+    if (clamp_quality(250) != 100)   { ret 3; }
+    ret 0;
+}
