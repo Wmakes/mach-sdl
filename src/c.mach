@@ -679,6 +679,49 @@ pub ext fun SDL_RenderReadPixels(renderer: ptr, rect: *Rect) ptr;
 #[library("sdl")]
 pub ext fun SDL_RemovePath(path: *u8) u8;
 
+# --- filesystem (SDL_filesystem.h) ---
+#
+# signatures verified against SDL_filesystem.h at release-3.2.0.
+#
+# SDL_GetBasePath and SDL_GetUserFolder return strings SDL owns: borrowed,
+# never freed. SDL_GetPrefPath and SDL_GlobDirectory return fresh
+# allocations the caller must release with SDL_free. SDL_Folder and
+# SDL_PathType are held as i32, SDL_GlobFlags as u32 (C enums are int-sized).
+#
+# SDL_PathInfo: type i32(4) + 4 pad, size Uint64(8), then three SDL_Time
+# (Sint64) create/modify/access times (24) = 40 bytes.
+
+pub rec PathInfo {
+    path_type:   i32;
+    _pad:        i32;
+    size:        u64;
+    create_time: i64;
+    modify_time: i64;
+    access_time: i64;
+}
+
+test sdl_c_pathinfo_layout_is_40_bytes {
+    if ($size_of(PathInfo) != 40) { ret 1; }
+    ret 0;
+}
+
+#[library("sdl")]
+pub ext fun SDL_GetBasePath() *u8;
+#[library("sdl")]
+pub ext fun SDL_GetPrefPath(org: *u8, app: *u8) *u8;
+#[library("sdl")]
+pub ext fun SDL_GetUserFolder(folder: i32) *u8;
+#[library("sdl")]
+pub ext fun SDL_CreateDirectory(path: *u8) u8;
+#[library("sdl")]
+pub ext fun SDL_RenamePath(old_path: *u8, new_path: *u8) u8;
+#[library("sdl")]
+pub ext fun SDL_CopyFile(old_path: *u8, new_path: *u8) u8;
+#[library("sdl")]
+pub ext fun SDL_GetPathInfo(path: *u8, info: *PathInfo) u8;
+#[library("sdl")]
+pub ext fun SDL_GlobDirectory(path: *u8, pattern: *u8, flags: u32, count: *i32) **u8;
+
 # --- glue for SDL_mixer (SDL_properties.h) ---
 #
 # SDL_mixer's MIX_PlayTrack and MIX_PlayTag accept play options as an

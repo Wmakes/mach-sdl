@@ -1,4 +1,10 @@
-# file I/O using SDL_IOStream (sdl.file)
+# file I/O and filesystem access using SDL_IOStream (sdl.file)
+#
+# the second half of this module covers paths and directories: well-known
+# folders, an application's data directory, path queries, directory
+# creation, rename, copy and glob listing. strings SDL hands out are
+# borrowed (base_path, user_folder, entry) unless the docs say otherwise;
+# pref_path and glob allocate and have a matching free_path / free_matches.
 #
 # Stream reads and writes files using an opaque SDL_IOStream handle. open a
 # file with open_read or open_write, then read/write/seek as needed, then
@@ -13,6 +19,7 @@ use sdl.c;
 use sdl.error;
 use std.types.bool.bool;
 use std.types.error.err;
+use std.types.option.opt;
 use std.types.result.res;
 use std.types.size.usize;
 use std.types.string.str;
@@ -198,4 +205,229 @@ pub fun size(stream: Stream) res[i64, error.Error] {
 # ret:  ok, or error.Error.failed (text from error.message())
 pub fun remove(path: str) err[error.Error] {
     ret to_err(c.SDL_RemovePath(path::*u8));
+}
+
+# --- paths and directories ---
+
+# well-known user folder, for user_folder
+pub val FOLDER_HOME:        i32 = 0;
+pub val FOLDER_DESKTOP:     i32 = 1;
+pub val FOLDER_DOCUMENTS:   i32 = 2;
+pub val FOLDER_DOWNLOADS:   i32 = 3;
+pub val FOLDER_MUSIC:       i32 = 4;
+pub val FOLDER_PICTURES:    i32 = 5;
+pub val FOLDER_PUBLICSHARE: i32 = 6;
+pub val FOLDER_SAVEDGAMES:  i32 = 7;
+pub val FOLDER_SCREENSHOTS: i32 = 8;
+pub val FOLDER_TEMPLATES:   i32 = 9;
+pub val FOLDER_VIDEOS:      i32 = 10;
+
+# glob flag: match the pattern without regard to letter case
+pub val GLOB_CASEINSENSITIVE: u32 = 1;
+
+# what a path points at
+# ---
+# none:      the path does not exist
+# file:      a regular file
+# directory: a directory
+# other:     something else (device node, pipe, ...). symlinks are followed
+pub tag PathType: u8 {
+    none;
+    file;
+    directory;
+    other;
+}
+
+# information about a path, from path_info
+# ---
+# kind:        what the path is
+# size:        file size in bytes
+# create_time: creation time, nanoseconds since the Unix epoch (0 if unknown)
+# modify_time: last modification time, same units
+# access_time: last access time, same units
+pub rec PathInfo {
+    kind:        PathType;
+    size:        u64;
+    create_time: i64;
+    modify_time: i64;
+    access_time: i64;
+}
+
+# the result of a glob: a list of matching paths owned by SDL. release it
+# with free_matches. the zero value (nil list) is empty
+# ---
+# list:  SDL's NULL-terminated array of strings, nil when empty
+# count: number of entries
+pub rec Matches {
+    list:  **u8;
+    count: i32;
+}
+
+# the folder the application was started from (where its resources live)
+#
+# the string is SDL-owned and borrowed: do not free it.
+# ---
+# ret: the path with a trailing separator, or error.Error.failed
+pub fun base_path() res[str, error.Error] {
+    val raw: *u8 = c.SDL_GetBasePath();
+    if (raw == nil) {
+        ret res[str, error.Error].err{ error.Error.failed{} };
+    }
+    val s: str = raw;
+    ret res[str, error.Error].ok{ s };
+}
+
+# a folder where the application may write its own data. SDL creates it if
+# needed. release the string with free_path
+# ---
+# org: organization or developer name
+# app: application name
+# ret: the path with a trailing separator (SDL-allocated), or error.Error.failed
+pub fun pref_path(org: str, app: str) res[str, error.Error] {
+    val raw: *u8 = c.SDL_GetPrefPath(org::*u8, app::*u8);
+    if (raw == nil) {
+        ret res[str, error.Error].err{ error.Error.failed{} };
+    }
+    val s: str = raw;
+    ret res[str, error.Error].ok{ s };
+}
+
+# release a string returned by pref_path
+# ---
+# path: the string to free; do not use it afterwards
+pub fun free_path(path: str) {
+    c.SDL_free(path::ptr);
+}
+
+# the user's folder of a given kind. the string is borrowed: do not free it
+# ---
+# folder: one of the FOLDER_* values
+# ret:    the path, or error.Error.failed (not available on this platform)
+pub fun user_folder(folder: i32) res[str, error.Error] {
+    val raw: *u8 = c.SDL_GetUserFolder(folder);
+    if (raw == nil) {
+        ret res[str, error.Error].err{ error.Error.failed{} };
+    }
+    val s: str = raw;
+    ret res[str, error.Error].ok{ s };
+}
+
+# create a directory and any missing parents. succeeds if it already exists
+# ---
+# path: UTF-8 directory path
+# ret:  ok, or error.Error.failed (text from error.message())
+pub fun create_directory(path: str) err[error.Error] {
+    ret to_err(c.SDL_CreateDirectory(path::*u8));
+}
+
+# rename or move a file or directory
+# ---
+# old_path: existing path
+# new_path: new path
+# ret:      ok, or error.Error.failed (text from error.message())
+pub fun rename(old_path: str, new_path: str) err[error.Error] {
+    ret to_err(c.SDL_RenamePath(old_path::*u8, new_path::*u8));
+}
+
+# copy a file. an existing destination is overwritten
+# ---
+# old_path: file to copy
+# new_path: destination file
+# ret:      ok, or error.Error.failed (text from error.message())
+pub fun copy(old_path: str, new_path: str) err[error.Error] {
+    ret to_err(c.SDL_CopyFile(old_path::*u8, new_path::*u8));
+}
+
+# what a path is, and its size and times
+# ---
+# path: UTF-8 path
+# ret:  the PathInfo, or error.Error.failed if the path does not exist or
+#       cannot be read (use exists to test existence without an error)
+pub fun path_info(path: str) res[PathInfo, error.Error] {
+    var raw: c.PathInfo;
+    if (c.SDL_GetPathInfo(path::*u8, ?raw) == 0) {
+        ret res[PathInfo, error.Error].err{ error.Error.failed{} };
+    }
+    var kind: PathType = PathType.other{};
+    if (raw.path_type == 0) { kind = PathType.none{}; }
+    if (raw.path_type == 1) { kind = PathType.file{}; }
+    if (raw.path_type == 2) { kind = PathType.directory{}; }
+    ret res[PathInfo, error.Error].ok{ PathInfo{
+        kind:        kind,
+        size:        raw.size,
+        create_time: raw.create_time,
+        modify_time: raw.modify_time,
+        access_time: raw.access_time
+    } };
+}
+
+# whether a path exists (file, directory or other)
+# ---
+# path: UTF-8 path
+# ret:  true if SDL can find it
+pub fun exists(path: str) bool {
+    var raw: c.PathInfo;
+    ret c.SDL_GetPathInfo(path::*u8, ?raw) != 0;
+}
+
+# whether a path is a regular file
+# ---
+# path: UTF-8 path
+# ret:  true if it exists and is a file
+pub fun is_file(path: str) bool {
+    var raw: c.PathInfo;
+    ret c.SDL_GetPathInfo(path::*u8, ?raw) != 0 && raw.path_type == 1;
+}
+
+# whether a path is a directory
+# ---
+# path: UTF-8 path
+# ret:  true if it exists and is a directory
+pub fun is_directory(path: str) bool {
+    var raw: c.PathInfo;
+    ret c.SDL_GetPathInfo(path::*u8, ?raw) != 0 && raw.path_type == 2;
+}
+
+# list the entries below a directory, optionally filtered by a pattern.
+# release the result with free_matches
+#
+# the pattern supports `*` and `?` and is matched against paths relative to
+# `path`; entries in subdirectories are included.
+# ---
+# path:    directory to search
+# pattern: glob pattern, or "" for no filter
+# flags:   0 or GLOB_CASEINSENSITIVE
+# ret:     the Matches (possibly empty), or error.Error.failed
+pub fun glob(path: str, pattern: str, flags: u32) res[Matches, error.Error] {
+    var count: i32 = 0;
+    var pat: *u8 = pattern::*u8;
+    if (pattern[0] == 0) { pat = nil; }
+    val list: **u8 = c.SDL_GlobDirectory(path::*u8, pat, flags, ?count);
+    if (list == nil) {
+        ret res[Matches, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Matches, error.Error].ok{ Matches{ list: list, count: count } };
+}
+
+# one entry of a glob result. the string is borrowed from the list: it is
+# valid until free_matches
+# ---
+# m:     the glob result
+# index: from 0 up to m.count - 1
+# ret:   the path, or none for an index out of range
+pub fun entry(m: Matches, index: i32) opt[str] {
+    if (m.list == nil || index < 0 || index >= m.count) {
+        ret opt[str].none{};
+    }
+    val s: str = m.list[index];
+    ret opt[str].some{ s };
+}
+
+# release a glob result. safe to call on the zero value
+# ---
+# m: the result to free; do not use it or its entries afterwards
+pub fun free_matches(m: Matches) {
+    if (m.list != nil) {
+        c.SDL_free(m.list::ptr);
+    }
 }
