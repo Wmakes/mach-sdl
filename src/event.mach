@@ -103,6 +103,35 @@ pub rec TextInput {
     text:   str;
 }
 
+# a gamepad was plugged in or removed
+# ---
+# id: instance id; pass it to gamepad.open on an add, and compare it with
+#     gamepad.id() to find the pad that went away on a remove
+pub rec GamepadDevice {
+    id: u32;
+}
+
+# gamepad button press or release
+# ---
+# id:     instance id of the gamepad
+# button: which button, compare with the sdl.gamepad button constants
+pub rec GamepadButton {
+    id:     u32;
+    button: u8;
+}
+
+# gamepad stick or trigger movement
+# ---
+# id:    instance id of the gamepad
+# axis:  which axis, compare with gamepad.LEFT_X and the other axis constants
+# value: raw reading, -32768..32767 (triggers 0..32767); scale it with
+#        gamepad.normalize
+pub rec GamepadAxis {
+    id:    u32;
+    axis:  u8;
+    value: i16;
+}
+
 # one event from the queue
 # ---
 # unknown:             an SDL event this binding does not map; the payload
@@ -119,6 +148,11 @@ pub rec TextInput {
 # mouse_button_up:     a mouse button was released
 # mouse_wheel:         the wheel was scrolled
 # text_input:          text was typed (see TextInput)
+# gamepad_added:       a gamepad was plugged in (needs core.GAMEPAD)
+# gamepad_removed:     a gamepad was unplugged
+# gamepad_button_down: a gamepad button was pressed
+# gamepad_button_up:   a gamepad button was released
+# gamepad_axis:        a gamepad stick or trigger moved
 pub tag Event: u8 {
     unknown: u32;
     quit;
@@ -133,6 +167,11 @@ pub tag Event: u8 {
     mouse_button_up: MouseButton;
     mouse_wheel: MouseWheel;
     text_input: TextInput;
+    gamepad_added: GamepadDevice;
+    gamepad_removed: GamepadDevice;
+    gamepad_button_down: GamepadButton;
+    gamepad_button_up: GamepadButton;
+    gamepad_axis: GamepadAxis;
 }
 
 # copy the window fields out of a raw window event
@@ -205,6 +244,24 @@ fun text_event(raw: *c.Event) TextInput {
     };
 }
 
+# copy the id out of a raw gamepad device event
+fun gamepad_device_event(raw: *c.Event) GamepadDevice {
+    val d: *c.GamepadDeviceEvent = raw::*c.GamepadDeviceEvent;
+    ret GamepadDevice{ id: (@d).which };
+}
+
+# copy the fields out of a raw gamepad button event
+fun gamepad_button_event(raw: *c.Event) GamepadButton {
+    val b: *c.GamepadButtonEvent = raw::*c.GamepadButtonEvent;
+    ret GamepadButton{ id: (@b).which, button: (@b).button };
+}
+
+# copy the fields out of a raw gamepad axis event
+fun gamepad_axis_event(raw: *c.Event) GamepadAxis {
+    val a: *c.GamepadAxisEvent = raw::*c.GamepadAxisEvent;
+    ret GamepadAxis{ id: (@a).which, axis: (@a).axis, value: (@a).value };
+}
+
 # decode one raw SDL event into the Event tag
 fun decode(raw: *c.Event) Event {
     val t: u32 = (@raw).event_type;
@@ -220,6 +277,11 @@ fun decode(raw: *c.Event) Event {
     if (t == c.EVENT_MOUSE_BUTTON_UP) { ret Event.mouse_button_up{ button_event(raw) }; }
     if (t == c.EVENT_MOUSE_WHEEL) { ret Event.mouse_wheel{ wheel_event(raw) }; }
     if (t == c.EVENT_TEXT_INPUT) { ret Event.text_input{ text_event(raw) }; }
+    if (t == c.EVENT_GAMEPAD_ADDED) { ret Event.gamepad_added{ gamepad_device_event(raw) }; }
+    if (t == c.EVENT_GAMEPAD_REMOVED) { ret Event.gamepad_removed{ gamepad_device_event(raw) }; }
+    if (t == c.EVENT_GAMEPAD_BUTTON_DOWN) { ret Event.gamepad_button_down{ gamepad_button_event(raw) }; }
+    if (t == c.EVENT_GAMEPAD_BUTTON_UP) { ret Event.gamepad_button_up{ gamepad_button_event(raw) }; }
+    if (t == c.EVENT_GAMEPAD_AXIS_MOTION) { ret Event.gamepad_axis{ gamepad_axis_event(raw) }; }
     ret Event.unknown{ t };
 }
 

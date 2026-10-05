@@ -1,0 +1,332 @@
+# game controllers: buttons, sticks, triggers, rumble (sdl.gamepad)
+#
+# call core.init(core.GAMEPAD) first. controllers show up as event.Event
+# cases (gamepad_added, gamepad_removed, gamepad_button_down, ...) and can
+# also be read directly each frame:
+#
+# ```mach
+# val ids: i32 = gamepad.count();
+# val id: opt[u32] = gamepad.id_at(0);
+# if (sel id.some) {
+#     val pad: res[gamepad.Gamepad, error.Error] = gamepad.open(id.some);
+#     if (sel pad.ok) {
+#         val x: f32 = gamepad.axis_value(pad.ok, gamepad.LEFT_X);
+#         if (gamepad.pressed(pad.ok, gamepad.SOUTH)) { ... }
+#     }
+# }
+# ```
+#
+# a Gamepad is a by-value handle around SDL_Gamepad. a device is identified
+# by an instance id (u32): SDL assigns it when the device is plugged in and
+# never reuses it, so it is not a player number. open the id from a
+# gamepad_added event, close the Gamepad on gamepad_removed.
+#
+# a nil handle is rejected with error.Error.invalid before SDL is called.
+
+use sdl.c;
+use sdl.error;
+use std.types.bool.bool;
+use std.types.bool.false;
+use std.types.error.err;
+use std.types.option.opt;
+use std.types.result.res;
+use std.types.size.usize;
+use std.types.string.str;
+
+# handle to an open gamepad. the zero value (nil handle) is invalid
+# ---
+# handle: opaque SDL_Gamepad pointer, nil when invalid
+pub rec Gamepad {
+    handle: ptr;
+}
+
+# button: bottom face button (Xbox A, PlayStation cross)
+pub val SOUTH:          u8 = c.GAMEPAD_BUTTON_SOUTH;
+# button: right face button (Xbox B, PlayStation circle)
+pub val EAST:           u8 = c.GAMEPAD_BUTTON_EAST;
+# button: left face button (Xbox X, PlayStation square)
+pub val WEST:           u8 = c.GAMEPAD_BUTTON_WEST;
+# button: top face button (Xbox Y, PlayStation triangle)
+pub val NORTH:          u8 = c.GAMEPAD_BUTTON_NORTH;
+# button: back / select / share
+pub val BACK:           u8 = c.GAMEPAD_BUTTON_BACK;
+# button: the central logo button
+pub val GUIDE:          u8 = c.GAMEPAD_BUTTON_GUIDE;
+# button: start / options
+pub val START:          u8 = c.GAMEPAD_BUTTON_START;
+# button: left stick pressed in
+pub val LEFT_STICK:     u8 = c.GAMEPAD_BUTTON_LEFT_STICK;
+# button: right stick pressed in
+pub val RIGHT_STICK:    u8 = c.GAMEPAD_BUTTON_RIGHT_STICK;
+# button: left bumper
+pub val LEFT_SHOULDER:  u8 = c.GAMEPAD_BUTTON_LEFT_SHOULDER;
+# button: right bumper
+pub val RIGHT_SHOULDER: u8 = c.GAMEPAD_BUTTON_RIGHT_SHOULDER;
+# button: d-pad up
+pub val DPAD_UP:        u8 = c.GAMEPAD_BUTTON_DPAD_UP;
+# button: d-pad down
+pub val DPAD_DOWN:      u8 = c.GAMEPAD_BUTTON_DPAD_DOWN;
+# button: d-pad left
+pub val DPAD_LEFT:      u8 = c.GAMEPAD_BUTTON_DPAD_LEFT;
+# button: d-pad right
+pub val DPAD_RIGHT:     u8 = c.GAMEPAD_BUTTON_DPAD_RIGHT;
+# button: an extra button (share, microphone, capture, depending on the pad)
+pub val MISC1:          u8 = c.GAMEPAD_BUTTON_MISC1;
+# button: the PlayStation touchpad click
+pub val TOUCHPAD:       u8 = c.GAMEPAD_BUTTON_TOUCHPAD;
+
+# axis: left stick, horizontal. negative is left
+pub val LEFT_X:        u8 = c.GAMEPAD_AXIS_LEFTX::u8;
+# axis: left stick, vertical. negative is up
+pub val LEFT_Y:        u8 = c.GAMEPAD_AXIS_LEFTY::u8;
+# axis: right stick, horizontal. negative is left
+pub val RIGHT_X:       u8 = c.GAMEPAD_AXIS_RIGHTX::u8;
+# axis: right stick, vertical. negative is up
+pub val RIGHT_Y:       u8 = c.GAMEPAD_AXIS_RIGHTY::u8;
+# axis: left trigger. 0 released, 32767 fully pulled
+pub val LEFT_TRIGGER:  u8 = c.GAMEPAD_AXIS_LEFT_TRIGGER::u8;
+# axis: right trigger. 0 released, 32767 fully pulled
+pub val RIGHT_TRIGGER: u8 = c.GAMEPAD_AXIS_RIGHT_TRIGGER::u8;
+
+# whether a Gamepad holds a live handle
+# ---
+# pad: gamepad to test
+# ret: true if the handle is non-nil
+pub fun is_valid(pad: Gamepad) bool {
+    ret pad.handle != nil;
+}
+
+# turn an SDL bool result into err[error.Error]
+# ---
+# succeeded: the u8 result of an SDL call, nonzero on success
+fun to_err(succeeded: u8) err[error.Error] {
+    if (succeeded == 0) {
+        ret err[error.Error].err{ error.Error.failed{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# reject a nil handle before SDL is called
+# ---
+# pad: gamepad the caller is about to use
+fun ready(pad: Gamepad) err[error.Error] {
+    if (!is_valid(pad)) {
+        ret err[error.Error].err{ error.Error.invalid{} };
+    }
+    ret err[error.Error].ok{};
+}
+
+# scale a raw axis reading to -1.0..1.0 (0.0..1.0 for a trigger)
+# ---
+# raw: an axis reading, -32768..32767
+# ret: the reading as a fraction of full travel, never below -1.0
+pub fun normalize(raw: i16) f32 {
+    val v: f32 = raw::f32;
+    if (v < 0.0) {
+        val n: f32 = v / 32768.0;
+        ret n;
+    }
+    ret v / 32767.0;
+}
+
+# how many gamepads SDL currently lists
+# ---
+# ret: the count, 0 if there are none or SDL reports failure
+pub fun count() i32 {
+    var n: i32 = 0;
+    val ids: ptr = c.SDL_GetGamepads(?n);
+    if (ids == nil) {
+        ret 0;
+    }
+    c.SDL_free(ids);
+    ret n;
+}
+
+# the instance id of the gamepad at a position in SDL's current list. the
+# binding reads and frees SDL's id array itself, so there is nothing to
+# release. the list changes as devices come and go, so an index is only
+# meaningful right after count()
+# ---
+# index: position, from 0 up to count() - 1
+# ret:   the id to pass to open, or none for an index out of range or if SDL fails
+pub fun id_at(index: i32) opt[u32] {
+    var n: i32 = 0;
+    val ids: ptr = c.SDL_GetGamepads(?n);
+    if (ids == nil) {
+        ret opt[u32].none{};
+    }
+    if (index < 0 || index >= n) {
+        c.SDL_free(ids);
+        ret opt[u32].none{};
+    }
+    val id: u32 = ((ids::usize + (index::usize) * 4)::*u32)[0];
+    c.SDL_free(ids);
+    ret opt[u32].some{ id };
+}
+
+# open a gamepad so its state can be read. SDL ref-counts opens of the same
+# device, so opening an id twice is fine as long as each is closed
+# ---
+# id:  instance id, from id_at or a gamepad_added event
+# ret: the Gamepad, or error.Error.failed (text from error.message())
+pub fun open(id: u32) res[Gamepad, error.Error] {
+    val handle: ptr = c.SDL_OpenGamepad(id);
+    if (handle == nil) {
+        ret res[Gamepad, error.Error].err{ error.Error.failed{} };
+    }
+    ret res[Gamepad, error.Error].ok{ Gamepad{ handle: handle } };
+}
+
+# close a gamepad. safe on an invalid handle
+# ---
+# pad: gamepad to close
+pub fun close(pad: Gamepad) {
+    if (is_valid(pad)) {
+        c.SDL_CloseGamepad(pad.handle);
+    }
+}
+
+# the instance id of an open gamepad, to match against event ids
+# ---
+# pad: an open gamepad
+# ret: the id, or 0 (never a real id) for an invalid handle
+pub fun id(pad: Gamepad) u32 {
+    if (!is_valid(pad)) {
+        ret 0;
+    }
+    ret c.SDL_GetGamepadID(pad.handle);
+}
+
+# the human-readable name of an open gamepad
+# ---
+# pad: an open gamepad
+# ret: the name, borrowed from SDL (copy it if it must outlive the next SDL
+#      call); empty for an invalid handle or an unnamed device
+pub fun name(pad: Gamepad) str {
+    if (!is_valid(pad)) {
+        ret "";
+    }
+    val raw: *u8 = c.SDL_GetGamepadName(pad.handle);
+    if (raw == nil) {
+        ret "";
+    }
+    ret raw;
+}
+
+# whether an open gamepad is still plugged in
+# ---
+# pad: gamepad to query
+# ret: true if connected; false for an invalid handle
+pub fun connected(pad: Gamepad) bool {
+    if (!is_valid(pad)) {
+        ret false;
+    }
+    ret c.SDL_GamepadConnected(pad.handle) != 0;
+}
+
+# whether a button is held
+# ---
+# pad:    an open gamepad
+# button: SOUTH, EAST, START, DPAD_UP, ... (any of the button constants)
+# ret:    true if held; false for an invalid handle or an unknown button
+pub fun pressed(pad: Gamepad, button: u8) bool {
+    if (!is_valid(pad)) {
+        ret false;
+    }
+    ret c.SDL_GetGamepadButton(pad.handle, button::i32) != 0;
+}
+
+# the raw reading of a stick or trigger axis
+# ---
+# pad:   an open gamepad
+# which: LEFT_X, LEFT_Y, RIGHT_X, RIGHT_Y, LEFT_TRIGGER or RIGHT_TRIGGER
+# ret:   -32768..32767 (triggers 0..32767); 0 for an invalid handle
+pub fun axis_raw(pad: Gamepad, which: u8) i16 {
+    if (!is_valid(pad)) {
+        ret 0;
+    }
+    ret c.SDL_GetGamepadAxis(pad.handle, which::i32);
+}
+
+# a stick or trigger axis scaled to -1.0..1.0 (triggers 0.0..1.0). sticks
+# rarely rest at exactly 0, so apply a dead zone before using it
+# ---
+# pad:   an open gamepad
+# which: LEFT_X, LEFT_Y, RIGHT_X, RIGHT_Y, LEFT_TRIGGER or RIGHT_TRIGGER
+# ret:   the scaled reading; 0.0 for an invalid handle
+pub fun axis_value(pad: Gamepad, which: u8) f32 {
+    ret normalize(axis_raw(pad, which));
+}
+
+# start a rumble effect, replacing any rumble already playing
+# ---
+# pad:  an open gamepad
+# low:  strength of the low-frequency (big) motor, 0..65535
+# high: strength of the high-frequency (small) motor, 0..65535
+# ms:   how long to run, in milliseconds
+# ret:  ok, or error.Error.invalid for a nil handle, or error.Error.failed
+#       if the pad has no rumble (text from error.message())
+pub fun rumble(pad: Gamepad, low: u16, high: u16, ms: u32) err[error.Error] {
+    val r: err[error.Error] = ready(pad);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RumbleGamepad(pad.handle, low, high, ms));
+}
+
+# start a rumble effect in the triggers (Xbox One controllers). this is
+# separate from rumble: the two can run at once
+# ---
+# pad:   an open gamepad
+# left:  strength of the left trigger motor, 0..65535
+# right: strength of the right trigger motor, 0..65535
+# ms:    how long to run, in milliseconds
+# ret:   ok, or error.Error.invalid for a nil handle, or error.Error.failed
+#        if the pad has no trigger rumble (text from error.message())
+pub fun rumble_triggers(pad: Gamepad, left: u16, right: u16, ms: u32) err[error.Error] {
+    val r: err[error.Error] = ready(pad);
+    if (!sel r.ok) { ret r; }
+    ret to_err(c.SDL_RumbleGamepadTriggers(pad.handle, left, right, ms));
+}
+
+# stop all rumble, including trigger rumble
+# ---
+# pad: an open gamepad
+# ret: same as rumble
+pub fun stop_rumble(pad: Gamepad) err[error.Error] {
+    val r: err[error.Error] = rumble(pad, 0, 0, 0);
+    if (!sel r.ok) { ret r; }
+    ret rumble_triggers(pad, 0, 0, 0);
+}
+
+# set the LED color (e.g. the PlayStation light bar)
+# ---
+# pad:     an open gamepad
+# r, g, b: color components, 0..255
+# ret:     ok, or error.Error.invalid for a nil handle, or error.Error.failed
+#          if the pad has no color LED (text from error.message())
+pub fun set_led(pad: Gamepad, r: u8, g: u8, b: u8) err[error.Error] {
+    val chk: err[error.Error] = ready(pad);
+    if (!sel chk.ok) { ret chk; }
+    ret to_err(c.SDL_SetGamepadLED(pad.handle, r, g, b));
+}
+
+test gamepad__invalid_handle_rejected {
+    val pad: Gamepad = Gamepad{ handle: nil };
+    if (is_valid(pad)) { ret 1; }
+    if (pressed(pad, SOUTH)) { ret 2; }
+    if (connected(pad)) { ret 3; }
+    if (axis_raw(pad, LEFT_X) != 0) { ret 4; }
+    if (id(pad) != 0) { ret 5; }
+    val r: err[error.Error] = rumble(pad, 1, 1, 1);
+    if (!sel r.err) { ret 6; }
+    if (!sel r.err.invalid) { ret 7; }
+    close(pad);
+    ret 0;
+}
+
+test gamepad__normalize_range {
+    if (normalize(0) != 0.0) { ret 1; }
+    if (normalize(32767) != 1.0) { ret 2; }
+    val lowest: i16 = (0 - 32767) - 1;
+    if (normalize(lowest) != 0.0 - 1.0) { ret 3; }
+    ret 0;
+}

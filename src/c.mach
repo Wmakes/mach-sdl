@@ -9,9 +9,10 @@
 # bound: init/quit, hints, window, GL context, events, keyboard, mouse,
 # text input, timing, rects, random numbers, the 2D renderer and textures,
 # clipboard, message boxes, audio streams and WAV, SDL_IOStream and
-# SDL_Properties. not bound: gamepad, joystick, haptics, camera, sensors.
+# SDL_Properties, gamepads (with rumble and LED). not bound: joystick, haptics,
+# camera, sensors.
 
-# maintainer notes: transcribed from SDL3's headers at release-3.2.0. SDL3's
+# maintainer notes: transcribed from SDL3's headers at release-3.4.18. SDL3's
 # `bool` is a 1-byte C99 _Bool, so every SDL bool is declared u8 and
 # unwrapped with `!= 0` in the wrapper modules.
 
@@ -22,6 +23,8 @@ use std.types.size.usize;
 pub val INIT_VIDEO:  u32 = 0x00000020;
 pub val INIT_AUDIO:  u32 = 0x00000010;
 pub val INIT_EVENTS: u32 = 0x00004000;
+# implies the joystick subsystem, which implies EVENTS
+pub val INIT_GAMEPAD: u32 = 0x00002000;
 
 #[library("sdl")]
 pub ext fun SDL_Init(flags: u32) u8;
@@ -740,3 +743,127 @@ pub ext fun SDL_SetBooleanProperty(props: u32, name: *u8, value: u8) u8;
 pub ext fun SDL_SetFloatProperty(props: u32, name: *u8, value: f32) u8;
 #[library("sdl")]
 pub ext fun SDL_DestroyProperties(props: u32);
+
+# --- SDL_gamepad.h ---
+#
+# SDL_Gamepad is an opaque pointer (ptr here). SDL_JoystickID is a Uint32
+# instance id: it is assigned when a device is plugged in and is not reused,
+# so it is not a player index. SDL_GetGamepads returns a heap array of ids
+# that the caller frees with SDL_free. the axis/button numbers are the
+# SDL_GamepadAxis / SDL_GamepadButton enum values; the *_INVALID (-1)
+# members are left out.
+
+pub val GAMEPAD_BUTTON_SOUTH:          u8 = 0;
+pub val GAMEPAD_BUTTON_EAST:           u8 = 1;
+pub val GAMEPAD_BUTTON_WEST:           u8 = 2;
+pub val GAMEPAD_BUTTON_NORTH:          u8 = 3;
+pub val GAMEPAD_BUTTON_BACK:           u8 = 4;
+pub val GAMEPAD_BUTTON_GUIDE:          u8 = 5;
+pub val GAMEPAD_BUTTON_START:          u8 = 6;
+pub val GAMEPAD_BUTTON_LEFT_STICK:     u8 = 7;
+pub val GAMEPAD_BUTTON_RIGHT_STICK:    u8 = 8;
+pub val GAMEPAD_BUTTON_LEFT_SHOULDER:  u8 = 9;
+pub val GAMEPAD_BUTTON_RIGHT_SHOULDER: u8 = 10;
+pub val GAMEPAD_BUTTON_DPAD_UP:        u8 = 11;
+pub val GAMEPAD_BUTTON_DPAD_DOWN:      u8 = 12;
+pub val GAMEPAD_BUTTON_DPAD_LEFT:      u8 = 13;
+pub val GAMEPAD_BUTTON_DPAD_RIGHT:     u8 = 14;
+pub val GAMEPAD_BUTTON_MISC1:          u8 = 15;
+pub val GAMEPAD_BUTTON_TOUCHPAD:       u8 = 20;
+
+pub val GAMEPAD_AXIS_LEFTX:         i32 = 0;
+pub val GAMEPAD_AXIS_LEFTY:         i32 = 1;
+pub val GAMEPAD_AXIS_RIGHTX:        i32 = 2;
+pub val GAMEPAD_AXIS_RIGHTY:        i32 = 3;
+pub val GAMEPAD_AXIS_LEFT_TRIGGER:  i32 = 4;
+pub val GAMEPAD_AXIS_RIGHT_TRIGGER: i32 = 5;
+
+pub val EVENT_GAMEPAD_AXIS_MOTION: u32 = 0x650;
+pub val EVENT_GAMEPAD_BUTTON_DOWN: u32 = 0x651;
+pub val EVENT_GAMEPAD_BUTTON_UP:   u32 = 0x652;
+pub val EVENT_GAMEPAD_ADDED:       u32 = 0x653;
+pub val EVENT_GAMEPAD_REMOVED:     u32 = 0x654;
+
+# SDL_GamepadAxisEvent: type/reserved(8), timestamp u64(8), which u32(4),
+# axis/padding1-3 u8 x4(4), value Sint16(2), padding4 Uint16(2) = 28 bytes,
+# padded to 32.
+
+# SDL_GamepadAxisEvent, the layout of an EVENT_GAMEPAD_AXIS_MOTION event
+pub rec GamepadAxisEvent {
+    event_type: u32;
+    reserved:   u32;
+    timestamp:  u64;
+    which:      u32;
+    axis:       u8;
+    _pad1:      u8;
+    _pad2:      u8;
+    _pad3:      u8;
+    value:      i16;
+    _pad4:      u16;
+}
+
+test sdl_c_gamepadaxisevent_layout_is_32_bytes {
+    if ($size_of(GamepadAxisEvent) != 32) { ret 1; }
+    ret 0;
+}
+
+# SDL_GamepadButtonEvent: type/reserved(8), timestamp u64(8), which u32(4),
+# button/down/padding1/padding2 u8 x4(4) = 24 bytes, no tail padding.
+
+# SDL_GamepadButtonEvent, the layout of the EVENT_GAMEPAD_BUTTON_* events
+pub rec GamepadButtonEvent {
+    event_type: u32;
+    reserved:   u32;
+    timestamp:  u64;
+    which:      u32;
+    button:     u8;
+    down:       u8;
+    _pad1:      u8;
+    _pad2:      u8;
+}
+
+test sdl_c_gamepadbuttonevent_layout_is_24_bytes {
+    if ($size_of(GamepadButtonEvent) != 24) { ret 1; }
+    ret 0;
+}
+
+# SDL_GamepadDeviceEvent: type/reserved(8), timestamp u64(8), which u32(4)
+# = 20 bytes, padded to 24.
+
+# SDL_GamepadDeviceEvent, the layout of the EVENT_GAMEPAD_ADDED/REMOVED events
+pub rec GamepadDeviceEvent {
+    event_type: u32;
+    reserved:   u32;
+    timestamp:  u64;
+    which:      u32;
+}
+
+test sdl_c_gamepaddeviceevent_layout_is_24_bytes {
+    if ($size_of(GamepadDeviceEvent) != 24) { ret 1; }
+    ret 0;
+}
+
+#[library("sdl")]
+pub ext fun SDL_GetGamepads(count: *i32) ptr;
+#[library("sdl")]
+pub ext fun SDL_IsGamepad(instance_id: u32) u8;
+#[library("sdl")]
+pub ext fun SDL_OpenGamepad(instance_id: u32) ptr;
+#[library("sdl")]
+pub ext fun SDL_CloseGamepad(gamepad: ptr);
+#[library("sdl")]
+pub ext fun SDL_GetGamepadID(gamepad: ptr) u32;
+#[library("sdl")]
+pub ext fun SDL_GetGamepadName(gamepad: ptr) *u8;
+#[library("sdl")]
+pub ext fun SDL_GamepadConnected(gamepad: ptr) u8;
+#[library("sdl")]
+pub ext fun SDL_GetGamepadButton(gamepad: ptr, button: i32) u8;
+#[library("sdl")]
+pub ext fun SDL_GetGamepadAxis(gamepad: ptr, axis: i32) i16;
+#[library("sdl")]
+pub ext fun SDL_RumbleGamepad(gamepad: ptr, low_frequency: u16, high_frequency: u16, duration_ms: u32) u8;
+#[library("sdl")]
+pub ext fun SDL_RumbleGamepadTriggers(gamepad: ptr, left: u16, right: u16, duration_ms: u32) u8;
+#[library("sdl")]
+pub ext fun SDL_SetGamepadLED(gamepad: ptr, red: u8, green: u8, blue: u8) u8;

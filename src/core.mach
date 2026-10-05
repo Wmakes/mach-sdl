@@ -15,6 +15,9 @@ pub val AUDIO:  u32 = c.INIT_AUDIO;
 # init() flag: the event queue only, without video
 pub val EVENTS: u32 = c.INIT_EVENTS;
 
+# init() flag: the gamepad subsystem (sdl.gamepad). implies EVENTS
+pub val GAMEPAD: u32 = c.INIT_GAMEPAD;
+
 # turn an SDL bool result into err[error.Error]
 # ---
 # succeeded: the u8 result of an SDL call, nonzero on success

@@ -1,6 +1,6 @@
 # mach-sdl: SDL3 bindings for mach
 #
-# SDL3 windows, input, 2D rendering, OpenGL contexts and audio, plus
+# SDL3 windows, input (keyboard, mouse, gamepads), 2D rendering, OpenGL contexts and audio, plus
 # SDL3_ttf (text), SDL3_image (image files) and SDL3_mixer (audio mixing).
 #
 # ## setup
@@ -90,6 +90,7 @@
 # - sdl.window: create and manage windows
 # - sdl.event: poll the event queue as typed events
 # - sdl.key / sdl.mouse: keyboard and mouse state
+# - sdl.gamepad: game controllers, with rumble
 # - sdl.renderer / sdl.texture / sdl.surface: 2D drawing
 # - sdl.rect / sdl.color: geometry and color values
 # - sdl.gl: OpenGL contexts, as an alternative to sdl.renderer
@@ -111,6 +112,7 @@ fwd sdl.error;
 fwd sdl.event;
 fwd sdl.file;
 fwd sdl.font;
+fwd sdl.gamepad;
 fwd sdl.gl;
 fwd sdl.image;
 fwd sdl.img;
