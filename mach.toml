@@ -1,6 +1,6 @@
 [project]
 id = "sdl"
-version = "1.0.1"
+version = "1.1.0"
 src = "src"
 out = "out/{target.name}/{profile.name}"
 mach = "^6"
@@ -44,14 +44,14 @@ default = true
 entry   = "lib/libsdl.mach"
 out     = "lib/sdl"
 targets = ["*"]
-link    = ["sdl", "sdl-win", "sdl-ttf", "sdl-ttf-win", "sdl-image", "sdl-image-win", "sdl-mixer", "sdl-mixer-win"]
+link    = ["sdl", "sdl-win", "sdl-darwin", "sdl-ttf", "sdl-ttf-win", "sdl-ttf-darwin", "sdl-image", "sdl-image-win", "sdl-image-darwin", "sdl-mixer", "sdl-mixer-win", "sdl-mixer-darwin"]
 need    = []
 
 [link.sdl]
 source  = "system"
 name    = "SDL3"
 library = "sdl"
-os     = ["linux", "darwin"]
+os     = ["linux"]
 isa    = "*"
 abi    = "*"
 export = true
@@ -65,11 +65,20 @@ isa    = "*"
 abi    = "*"
 export = true
 
+[link.sdl-darwin]
+source  = "system"
+name    = "SDL3"
+library = "sdl"
+os      = ["darwin"]
+isa     = "*"
+abi     = "*"
+export  = true
+
 [link.sdl-ttf]
 source  = "system"
 name    = "SDL3_ttf"
 library = "sdl-ttf"
-os      = ["linux", "darwin"]
+os      = ["linux"]
 isa     = "*"
 abi     = "*"
 export  = true
@@ -83,11 +92,20 @@ isa     = "*"
 abi     = "*"
 export  = true
 
+[link.sdl-ttf-darwin]
+source  = "system"
+name    = "SDL3_ttf"
+library = "sdl-ttf"
+os      = ["darwin"]
+isa     = "*"
+abi     = "*"
+export  = true
+
 [link.sdl-image]
 source  = "system"
 name    = "SDL3_image"
 library = "sdl-image"
-os      = ["linux", "darwin"]
+os      = ["linux"]
 isa     = "*"
 abi     = "*"
 export  = true
@@ -101,11 +119,20 @@ isa     = "*"
 abi     = "*"
 export  = true
 
+[link.sdl-image-darwin]
+source  = "system"
+name    = "SDL3_image"
+library = "sdl-image"
+os      = ["darwin"]
+isa     = "*"
+abi     = "*"
+export  = true
+
 [link.sdl-mixer]
 source  = "system"
 name    = "SDL3_mixer"
 library = "sdl-mixer"
-os      = ["linux", "darwin"]
+os      = ["linux"]
 isa     = "*"
 abi     = "*"
 export  = true
@@ -115,6 +142,15 @@ source  = "system"
 name    = "SDL3_mixer.dll"
 library = "sdl-mixer"
 os      = ["windows"]
+isa     = "*"
+abi     = "*"
+export  = true
+
+[link.sdl-mixer-darwin]
+source  = "system"
+name    = "SDL3_mixer"
+library = "sdl-mixer"
+os      = ["darwin"]
 isa     = "*"
 abi     = "*"
 export  = true
