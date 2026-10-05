@@ -11,7 +11,13 @@
 
 ## Usage
 
-Add this repo as a dependency in your `mach.toml`:
+Add this repo to your project by running:
+
+```sh
+mach dep add . sdl --git https://github.com/Wmakes/mach-sdl
+```
+
+Or add it as a dependency in your `mach.toml` by hand:
 
 ```toml
 [dep.sdl]
