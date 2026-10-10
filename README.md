@@ -1,4 +1,4 @@
-# mach-sdl
+# mach-sdl [![License: LGPL v3](https://img.shields.io/badge/License-LGPL%20v3-blue.svg)](COPYING.LESSER)[![Mach](https://img.shields.io/badge/built%20with-Mach-orange)](https://github.com/briar-systems/mach)[![SDL3](https://img.shields.io/badge/SDL-3-informational)](https://github.com/libsdl-org/SDL)[![Platforms](https://img.shields.io/badge/platform-linux%20%7C%20windows%20%7C%20macos-lightgrey)](#requirements)
 
 [SDL3](https://github.com/libsdl-org/SDL) (and [SDL3_ttf](https://github.com/libsdl-org/SDL_ttf), [SDL3_image](https://github.com/libsdl-org/SDL_image) and [SDL3_mixer](https://github.com/libsdl-org/SDL_mixer)) bindings for the [mach](https://github.com/briar-systems/mach) programming language.
 
