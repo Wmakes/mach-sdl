@@ -102,7 +102,7 @@ pub rec AnimationInfo {
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -112,9 +112,9 @@ fun to_err(succeeded: u8) err[error.Error] {
 # handle: surface pointer, nil when SDL3_image failed
 fun surface_result(handle: ptr) res[surface.Surface, error.Error] {
     if (handle == nil) {
-        ret res[surface.Surface, error.Error].err{ error.Error.failed{} };
+        ret res[surface.Surface, error.Error].err{error.Error.failed{}};
     }
-    ret res[surface.Surface, error.Error].ok{ surface.Surface{ handle: handle } };
+    ret res[surface.Surface, error.Error].ok{surface.Surface{handle: handle}};
 }
 
 # wrap a raw texture pointer from an IMG_LoadTexture* call
@@ -122,9 +122,9 @@ fun surface_result(handle: ptr) res[surface.Surface, error.Error] {
 # handle: texture pointer, nil when SDL3_image failed
 fun texture_result(handle: ptr) res[texture.Texture, error.Error] {
     if (handle == nil) {
-        ret res[texture.Texture, error.Error].err{ error.Error.failed{} };
+        ret res[texture.Texture, error.Error].err{error.Error.failed{}};
     }
-    ret res[texture.Texture, error.Error].ok{ renderer.Texture{ handle: handle } };
+    ret res[texture.Texture, error.Error].ok{renderer.Texture{handle: handle}};
 }
 
 # wrap a raw animation pointer from an IMG_LoadAnimation* call
@@ -132,9 +132,9 @@ fun texture_result(handle: ptr) res[texture.Texture, error.Error] {
 # raw: animation pointer, nil when SDL3_image failed
 fun animation_result(raw: *img.Animation) res[Animation, error.Error] {
     if (raw == nil) {
-        ret res[Animation, error.Error].err{ error.Error.failed{} };
+        ret res[Animation, error.Error].err{error.Error.failed{}};
     }
-    ret res[Animation, error.Error].ok{ Animation{ handle: raw::ptr } };
+    ret res[Animation, error.Error].ok{Animation{handle: raw::ptr}};
 }
 
 # a read-only stream over a block of memory, nil for a nil or empty block
@@ -211,7 +211,7 @@ pub fun load(path: str) res[surface.Surface, error.Error] {
 #       error.Error.failed (text from error.message())
 pub fun load_texture(rend: renderer.Renderer, path: str) res[texture.Texture, error.Error] {
     if (!renderer.is_valid(rend)) {
-        ret res[texture.Texture, error.Error].err{ error.Error.invalid{} };
+        ret res[texture.Texture, error.Error].err{error.Error.invalid{}};
     }
     ret texture_result(img.IMG_LoadTexture(rend.handle, path));
 }
@@ -225,7 +225,7 @@ pub fun load_texture(rend: renderer.Renderer, path: str) res[texture.Texture, er
 pub fun load_mem(data: *u8, size: usize) res[surface.Surface, error.Error] {
     val stream: ptr = stream_of(data, size);
     if (stream == nil) {
-        ret res[surface.Surface, error.Error].err{ error.Error.invalid{} };
+        ret res[surface.Surface, error.Error].err{error.Error.invalid{}};
     }
     ret surface_result(img.IMG_Load_IO(stream, 1));
 }
@@ -241,7 +241,7 @@ pub fun load_mem(data: *u8, size: usize) res[surface.Surface, error.Error] {
 pub fun load_mem_as(data: *u8, size: usize, fmt: Format) res[surface.Surface, error.Error] {
     val stream: ptr = stream_of(data, size);
     if (stream == nil) {
-        ret res[surface.Surface, error.Error].err{ error.Error.invalid{} };
+        ret res[surface.Surface, error.Error].err{error.Error.invalid{}};
     }
     ret surface_result(img.IMG_LoadTyped_IO(stream, 1, format_name(fmt)));
 }
@@ -255,11 +255,11 @@ pub fun load_mem_as(data: *u8, size: usize, fmt: Format) res[surface.Surface, er
 #       or empty block, or error.Error.failed (text from error.message())
 pub fun load_texture_mem(rend: renderer.Renderer, data: *u8, size: usize) res[texture.Texture, error.Error] {
     if (!renderer.is_valid(rend)) {
-        ret res[texture.Texture, error.Error].err{ error.Error.invalid{} };
+        ret res[texture.Texture, error.Error].err{error.Error.invalid{}};
     }
     val stream: ptr = stream_of(data, size);
     if (stream == nil) {
-        ret res[texture.Texture, error.Error].err{ error.Error.invalid{} };
+        ret res[texture.Texture, error.Error].err{error.Error.invalid{}};
     }
     ret texture_result(img.IMG_LoadTexture_IO(rend.handle, stream, 1));
 }
@@ -277,7 +277,7 @@ pub fun load_texture_mem(rend: renderer.Renderer, data: *u8, size: usize) res[te
 pub fun load_svg_sized(path: str, width: i32, height: i32) res[surface.Surface, error.Error] {
     val stream: ptr = c.SDL_IOFromFile(path, "rb");
     if (stream == nil) {
-        ret res[surface.Surface, error.Error].err{ error.Error.failed{} };
+        ret res[surface.Surface, error.Error].err{error.Error.failed{}};
     }
     val loaded: ptr = img.IMG_LoadSizedSVG_IO(stream, width, height);
     c.SDL_CloseIO(stream);
@@ -319,11 +319,11 @@ fun detect_stream(stream: ptr) Format {
 pub fun detect(path: str) res[Format, error.Error] {
     val stream: ptr = c.SDL_IOFromFile(path, "rb");
     if (stream == nil) {
-        ret res[Format, error.Error].err{ error.Error.failed{} };
+        ret res[Format, error.Error].err{error.Error.failed{}};
     }
     val found: Format = detect_stream(stream);
     c.SDL_CloseIO(stream);
-    ret res[Format, error.Error].ok{ found };
+    ret res[Format, error.Error].ok{found};
 }
 
 # find out what format a block of memory is, from its contents
@@ -335,11 +335,11 @@ pub fun detect(path: str) res[Format, error.Error] {
 pub fun detect_mem(data: *u8, size: usize) res[Format, error.Error] {
     val stream: ptr = stream_of(data, size);
     if (stream == nil) {
-        ret res[Format, error.Error].err{ error.Error.invalid{} };
+        ret res[Format, error.Error].err{error.Error.invalid{}};
     }
     val found: Format = detect_stream(stream);
     c.SDL_CloseIO(stream);
-    ret res[Format, error.Error].ok{ found };
+    ret res[Format, error.Error].ok{found};
 }
 
 # --- saving ---
@@ -350,7 +350,7 @@ pub fun detect_mem(data: *u8, size: usize) res[Format, error.Error] {
 # path: file to write
 pub fun save_png(surf: surface.Surface, path: str) err[error.Error] {
     if (!surface.is_valid(surf)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret to_err(img.IMG_SavePNG(surf.handle, path));
 }
@@ -363,7 +363,7 @@ pub fun save_png(surf: surface.Surface, path: str) err[error.Error] {
 #          highest
 pub fun save_jpg(surf: surface.Surface, path: str, quality: i32) err[error.Error] {
     if (!surface.is_valid(surf)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret to_err(img.IMG_SaveJPG(surf.handle, path, clamp_quality(quality)));
 }
@@ -376,7 +376,7 @@ pub fun save_jpg(surf: surface.Surface, path: str, quality: i32) err[error.Error
 # quality: 0 (lowest) to 100 (highest), clamped
 pub fun save_avif(surf: surface.Surface, path: str, quality: i32) err[error.Error] {
     if (!surface.is_valid(surf)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret to_err(img.IMG_SaveAVIF(surf.handle, path, clamp_quality(quality)));
 }
@@ -396,7 +396,7 @@ pub fun is_animation_valid(anim: Animation) bool {
 # anim: animation the caller is about to use
 fun animation_ready(anim: Animation) err[error.Error] {
     if (!is_animation_valid(anim)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
@@ -421,7 +421,7 @@ pub fun load_animation(path: str) res[Animation, error.Error] {
 pub fun load_animation_mem(data: *u8, size: usize) res[Animation, error.Error] {
     val stream: ptr = stream_of(data, size);
     if (stream == nil) {
-        ret res[Animation, error.Error].err{ error.Error.invalid{} };
+        ret res[Animation, error.Error].err{error.Error.invalid{}};
     }
     ret animation_result(img.IMG_LoadAnimation_IO(stream, 1));
 }
@@ -443,10 +443,10 @@ pub fun destroy_animation(anim: Animation) {
 # ret:  the shape, or an error.Error on failure
 pub fun animation_info(anim: Animation) res[AnimationInfo, error.Error] {
     val r: err[error.Error] = animation_ready(anim);
-    if (sel r.err) { ret res[AnimationInfo, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[AnimationInfo, error.Error].err{r.err}; }
     val raw: *img.Animation = anim.handle::*img.Animation;
-    val a: img.Animation = @raw;
-    ret res[AnimationInfo, error.Error].ok{ AnimationInfo{ w: a.w, h: a.h, count: a.count } };
+    val a:   img.Animation  = @raw;
+    ret res[AnimationInfo, error.Error].ok{AnimationInfo{w: a.w, h: a.h, count: a.count}};
 }
 
 # one frame of an animation as a surface
@@ -460,15 +460,15 @@ pub fun animation_info(anim: Animation) res[AnimationInfo, error.Error] {
 #        out of range
 pub fun animation_frame(anim: Animation, index: i32) res[surface.Surface, error.Error] {
     val r: err[error.Error] = animation_ready(anim);
-    if (sel r.err) { ret res[surface.Surface, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[surface.Surface, error.Error].err{r.err}; }
     val raw: *img.Animation = anim.handle::*img.Animation;
-    val a: img.Animation = @raw;
+    val a:   img.Animation  = @raw;
     if (index < 0 || index >= a.count) {
-        ret res[surface.Surface, error.Error].err{ error.Error.invalid{} };
+        ret res[surface.Surface, error.Error].err{error.Error.invalid{}};
     }
     val stride: usize = $size_of(ptr);
-    val slot: *ptr = ((a.frames::usize + (index::usize) * stride)::*ptr);
-    ret res[surface.Surface, error.Error].ok{ surface.Surface{ handle: slot[0] } };
+    val slot:   *ptr  = ((a.frames::usize + (index::usize) * stride)::*ptr);
+    ret res[surface.Surface, error.Error].ok{surface.Surface{handle: slot[0]}};
 }
 
 # how long a frame is shown, in milliseconds
@@ -479,15 +479,15 @@ pub fun animation_frame(anim: Animation, index: i32) res[surface.Surface, error.
 #        out of range
 pub fun animation_delay(anim: Animation, index: i32) res[i32, error.Error] {
     val r: err[error.Error] = animation_ready(anim);
-    if (sel r.err) { ret res[i32, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[i32, error.Error].err{r.err}; }
     val raw: *img.Animation = anim.handle::*img.Animation;
-    val a: img.Animation = @raw;
+    val a:   img.Animation  = @raw;
     if (index < 0 || index >= a.count) {
-        ret res[i32, error.Error].err{ error.Error.invalid{} };
+        ret res[i32, error.Error].err{error.Error.invalid{}};
     }
     val stride: usize = $size_of(i32);
-    val slot: *i32 = ((a.delays::usize + (index::usize) * stride)::*i32);
-    ret res[i32, error.Error].ok{ slot[0] };
+    val slot:   *i32  = ((a.delays::usize + (index::usize) * stride)::*i32);
+    ret res[i32, error.Error].ok{slot[0]};
 }
 
 # upload one frame of an animation to a new texture. the animation stays
@@ -500,15 +500,15 @@ pub fun animation_delay(anim: Animation, index: i32) res[i32, error.Error] {
 #        animation or an index out of range, or error.Error.failed
 pub fun animation_frame_texture(rend: renderer.Renderer, anim: Animation, index: i32) res[texture.Texture, error.Error] {
     val frame: res[surface.Surface, error.Error] = animation_frame(anim, index);
-    if (sel frame.err) { ret res[texture.Texture, error.Error].err{ frame.err }; }
+    if (sel frame.err) { ret res[texture.Texture, error.Error].err{frame.err}; }
     ret texture.from_surface(rend, frame.ok);
 }
 
 test image__invalid_inputs_rejected {
-    val nil_surf: surface.Surface = surface.Surface{ handle: nil };
-    val saved: err[error.Error] = save_png(nil_surf, "unused.png");
+    val nil_surf: surface.Surface  = surface.Surface{handle: nil};
+    val saved:    err[error.Error] = save_png(nil_surf, "unused.png");
     if (!sel saved.err) { ret 1; }
-    val nil_anim: Animation = Animation{ handle: nil };
+    val nil_anim: Animation = Animation{handle: nil};
     if (is_animation_valid(nil_anim)) { ret 2; }
     val info: res[AnimationInfo, error.Error] = animation_info(nil_anim);
     if (!sel info.err) { ret 3; }
@@ -518,8 +518,8 @@ test image__invalid_inputs_rejected {
 }
 
 test image__quality_is_clamped {
-    if (clamp_quality(0 - 5) != 0)   { ret 1; }
-    if (clamp_quality(50) != 50)     { ret 2; }
-    if (clamp_quality(250) != 100)   { ret 3; }
+    if (clamp_quality(0 - 5) != 0) { ret 1; }
+    if (clamp_quality(50) != 50)   { ret 2; }
+    if (clamp_quality(250) != 100) { ret 3; }
     ret 0;
 }

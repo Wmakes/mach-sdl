@@ -56,8 +56,8 @@ use sdl.c;
 use sdl.error;
 use sdl.mix;
 use std.types.bool.bool;
-use std.types.bool.true;
 use std.types.bool.false;
+use std.types.bool.true;
 use std.types.error.err;
 use std.types.option.opt;
 use std.types.result.res;
@@ -105,14 +105,14 @@ pub rec Decoder {
 # options for play_track and play_tag. use default_options() to get SDL's
 # own defaults, then override what you need
 # ---
-# loops:              number of times to play after the first (0 = play once,
-#                     -1 = loop forever, clamped from below to -1 by SDL)
-# max_ms:             stop after this many milliseconds, -1 means no limit
-# start_ms:           start from this position in milliseconds
-# loop_start_ms:      loop restarts from this position, not from start_ms
-# fade_in_ms:         fade in over this many milliseconds (0 = no fade)
-# fade_in_start_gain: starting gain for the fade-in (0.0 = silence)
-# append_silence_ms:  append silence after the audio ends
+# loops:               number of times to play after the first (0 = play once,
+#                      -1 = loop forever, clamped from below to -1 by SDL)
+# max_ms:              stop after this many milliseconds, -1 means no limit
+# start_ms:            start from this position in milliseconds
+# loop_start_ms:       loop restarts from this position, not from start_ms
+# fade_in_ms:          fade in over this many milliseconds (0 = no fade)
+# fade_in_start_gain:  starting gain for the fade-in (0.0 = silence)
+# append_silence_ms:   append silence after the audio ends
 # halt_when_exhausted: stop the track when input runs out (true by default)
 pub rec PlayOptions {
     loops:               i32;
@@ -170,7 +170,7 @@ pub fun default_options() PlayOptions {
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -193,9 +193,9 @@ fun format_to_raw(fmt: audio.Format) u32 {
 fun raw_to_spec(raw: c.AudioSpec) res[Spec, error.Error] {
     val fmt: opt[audio.Format] = audio.format_from_raw(raw.format);
     if (!sel fmt.some) {
-        ret res[Spec, error.Error].err{ error.Error.unsupported{} };
+        ret res[Spec, error.Error].err{error.Error.unsupported{}};
     }
-    ret res[Spec, error.Error].ok{ Spec{ format: fmt.some, channels: raw.channels, freq: raw.freq } };
+    ret res[Spec, error.Error].ok{Spec{format: fmt.some, channels: raw.channels, freq: raw.freq}};
 }
 
 # whether a Mixer holds a live handle
@@ -240,35 +240,35 @@ pub fun is_decoder_valid(d: Decoder) bool {
 
 fun mixer_ready(m: Mixer) err[error.Error] {
     if (!is_mixer_valid(m)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
 
 fun audio_ready(a: Audio) err[error.Error] {
     if (!is_audio_valid(a)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
 
 fun track_ready(t: Track) err[error.Error] {
     if (!is_track_valid(t)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
 
 fun group_ready(g: Group) err[error.Error] {
     if (!is_group_valid(g)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
 
 fun decoder_ready(d: Decoder) err[error.Error] {
     if (!is_decoder_valid(d)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
@@ -316,10 +316,11 @@ fun pan_gains(pan: f32) mix.StereoGains {
     var right: f32 = 1.0;
     if (pan >= 0.0) {
         left = 1.0 - pan;
-    } or {
+    }
+    or {
         right = 1.0 + pan;
     }
-    ret mix.StereoGains{ left: left, right: right };
+    ret mix.StereoGains{left: left, right: right};
 }
 
 # --- lifecycle ---
@@ -363,10 +364,10 @@ pub fun decoder_count() i32 {
 pub fun decoder_name(index: i32) res[str, error.Error] {
     val raw: *u8 = mix.MIX_GetAudioDecoder(index);
     if (raw == nil) {
-        ret res[str, error.Error].err{ error.Error.invalid{} };
+        ret res[str, error.Error].err{error.Error.invalid{}};
     }
     val s: str = raw;
-    ret res[str, error.Error].ok{ s };
+    ret res[str, error.Error].ok{s};
 }
 
 # --- mixer ---
@@ -379,9 +380,9 @@ pub fun decoder_name(index: i32) res[str, error.Error] {
 pub fun create_device(devid: u32) res[Mixer, error.Error] {
     val h: ptr = mix.MIX_CreateMixerDevice(devid, nil);
     if (h == nil) {
-        ret res[Mixer, error.Error].err{ error.Error.failed{} };
+        ret res[Mixer, error.Error].err{error.Error.failed{}};
     }
-    ret res[Mixer, error.Error].ok{ Mixer{ handle: h } };
+    ret res[Mixer, error.Error].ok{Mixer{handle: h}};
 }
 
 # create a device-less mixer that produces samples only when you call
@@ -392,12 +393,12 @@ pub fun create_device(devid: u32) res[Mixer, error.Error] {
 # freq:     sample rate in Hz
 # ret:      the new Mixer, or error.Error.failed (text from error.message())
 pub fun create(fmt: audio.Format, channels: i32, freq: i32) res[Mixer, error.Error] {
-    val spec: c.AudioSpec = c.AudioSpec{ format: format_to_raw(fmt), channels: channels, freq: freq };
-    val h: ptr = mix.MIX_CreateMixer(?spec);
+    val spec: c.AudioSpec = c.AudioSpec{format: format_to_raw(fmt), channels: channels, freq: freq};
+    val h:    ptr         = mix.MIX_CreateMixer(?spec);
     if (h == nil) {
-        ret res[Mixer, error.Error].err{ error.Error.failed{} };
+        ret res[Mixer, error.Error].err{error.Error.failed{}};
     }
-    ret res[Mixer, error.Error].ok{ Mixer{ handle: h } };
+    ret res[Mixer, error.Error].ok{Mixer{handle: h}};
 }
 
 # destroy a mixer. for a device mixer, closes the device too. destroys every
@@ -417,10 +418,10 @@ pub fun destroy(m: Mixer) {
 # ret: the spec, or an error.Error on failure
 pub fun get_mixer_format(m: Mixer) res[Spec, error.Error] {
     val r: err[error.Error] = mixer_ready(m);
-    if (sel r.err) { ret res[Spec, error.Error].err{ r.err }; }
-    var raw: c.AudioSpec = c.AudioSpec{ format: 0, channels: 0, freq: 0 };
+    if (sel r.err) { ret res[Spec, error.Error].err{r.err}; }
+    var raw: c.AudioSpec = c.AudioSpec{format: 0, channels: 0, freq: 0};
     if (mix.MIX_GetMixerFormat(m.handle, ?raw) == 0) {
-        ret res[Spec, error.Error].err{ error.Error.failed{} };
+        ret res[Spec, error.Error].err{error.Error.failed{}};
     }
     ret raw_to_spec(raw);
 }
@@ -457,7 +458,7 @@ pub fun set_mixer_freq_ratio(m: Mixer, ratio: f32) err[error.Error] {
 
 # stop all tracks on a mixer, with an optional fade-out
 # ---
-# m:          mixer whose tracks to stop
+# m:           mixer whose tracks to stop
 # fade_out_ms: fade-out duration in milliseconds (0 for immediate stop)
 pub fun stop_all_tracks(m: Mixer, fade_out_ms: i64) err[error.Error] {
     val r: err[error.Error] = mixer_ready(m);
@@ -518,20 +519,20 @@ pub fun generate(m: Mixer, buf: ptr, buflen: i32) i32 {
 # usage, but no decode latency during playback). Audio is reference-counted:
 # destroy_audio unrefs it without stopping any track playing it
 # ---
-# m:        mixer this audio belongs to
-# path:     path to the audio file
+# m:         mixer this audio belongs to
+# path:      path to the audio file
 # predecode: true to decode fully at load time
-# ret:      the new Audio, or an error.Error on failure
+# ret:       the new Audio, or an error.Error on failure
 pub fun load_audio(m: Mixer, path: str, predecode: bool) res[Audio, error.Error] {
     val r: err[error.Error] = mixer_ready(m);
-    if (sel r.err) { ret res[Audio, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[Audio, error.Error].err{r.err}; }
     var pd: u8 = 0;
     if (predecode) { pd = 1; }
     val h: ptr = mix.MIX_LoadAudio(m.handle, path, pd);
     if (h == nil) {
-        ret res[Audio, error.Error].err{ error.Error.failed{} };
+        ret res[Audio, error.Error].err{error.Error.failed{}};
     }
-    ret res[Audio, error.Error].ok{ Audio{ handle: h } };
+    ret res[Audio, error.Error].ok{Audio{handle: h}};
 }
 
 # create a sine-wave tone with no file. ms < 0 makes an endless tone
@@ -543,12 +544,12 @@ pub fun load_audio(m: Mixer, path: str, predecode: bool) res[Audio, error.Error]
 # ret:       the new Audio, or an error.Error on failure
 pub fun create_sine(m: Mixer, hz: i32, amplitude: f32, ms: i64) res[Audio, error.Error] {
     val r: err[error.Error] = mixer_ready(m);
-    if (sel r.err) { ret res[Audio, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[Audio, error.Error].err{r.err}; }
     val h: ptr = mix.MIX_CreateSineWaveAudio(m.handle, hz, amplitude, ms);
     if (h == nil) {
-        ret res[Audio, error.Error].err{ error.Error.failed{} };
+        ret res[Audio, error.Error].err{error.Error.failed{}};
     }
-    ret res[Audio, error.Error].ok{ Audio{ handle: h } };
+    ret res[Audio, error.Error].ok{Audio{handle: h}};
 }
 
 # unreference an Audio. if a track is still playing it, the audio stays alive
@@ -569,10 +570,10 @@ pub fun destroy_audio(a: Audio) {
 #      unknown or infinite (e.g. an endless create_sine tone)
 pub fun audio_duration_ms(a: Audio) res[i64, error.Error] {
     val r: err[error.Error] = audio_ready(a);
-    if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[i64, error.Error].err{r.err}; }
     val frames: i64 = mix.MIX_GetAudioDuration(a.handle);
-    if (frames < 0) { ret res[i64, error.Error].err{ error.Error.failed{} }; }
-    ret res[i64, error.Error].ok{ mix.MIX_AudioFramesToMS(a.handle, frames) };
+    if (frames < 0) { ret res[i64, error.Error].err{error.Error.failed{}}; }
+    ret res[i64, error.Error].ok{mix.MIX_AudioFramesToMS(a.handle, frames)};
 }
 
 # the duration of an audio object in sample frames
@@ -582,10 +583,10 @@ pub fun audio_duration_ms(a: Audio) res[i64, error.Error] {
 #      unknown or infinite
 pub fun audio_frames(a: Audio) res[i64, error.Error] {
     val r: err[error.Error] = audio_ready(a);
-    if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[i64, error.Error].err{r.err}; }
     val frames: i64 = mix.MIX_GetAudioDuration(a.handle);
-    if (frames < 0) { ret res[i64, error.Error].err{ error.Error.failed{} }; }
-    ret res[i64, error.Error].ok{ frames };
+    if (frames < 0) { ret res[i64, error.Error].err{error.Error.failed{}}; }
+    ret res[i64, error.Error].ok{frames};
 }
 
 # the format, channels and sample rate of an audio object
@@ -594,10 +595,10 @@ pub fun audio_frames(a: Audio) res[i64, error.Error] {
 # ret: the spec, or an error.Error on failure
 pub fun get_audio_format(a: Audio) res[Spec, error.Error] {
     val r: err[error.Error] = audio_ready(a);
-    if (sel r.err) { ret res[Spec, error.Error].err{ r.err }; }
-    var raw: c.AudioSpec = c.AudioSpec{ format: 0, channels: 0, freq: 0 };
+    if (sel r.err) { ret res[Spec, error.Error].err{r.err}; }
+    var raw: c.AudioSpec = c.AudioSpec{format: 0, channels: 0, freq: 0};
     if (mix.MIX_GetAudioFormat(a.handle, ?raw) == 0) {
-        ret res[Spec, error.Error].err{ error.Error.failed{} };
+        ret res[Spec, error.Error].err{error.Error.failed{}};
     }
     ret raw_to_spec(raw);
 }
@@ -610,12 +611,12 @@ pub fun get_audio_format(a: Audio) res[Spec, error.Error] {
 # ret: the new Track, or an error.Error on failure
 pub fun create_track(m: Mixer) res[Track, error.Error] {
     val r: err[error.Error] = mixer_ready(m);
-    if (sel r.err) { ret res[Track, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[Track, error.Error].err{r.err}; }
     val h: ptr = mix.MIX_CreateTrack(m.handle);
     if (h == nil) {
-        ret res[Track, error.Error].err{ error.Error.failed{} };
+        ret res[Track, error.Error].err{error.Error.failed{}};
     }
-    ret res[Track, error.Error].ok{ Track{ handle: h } };
+    ret res[Track, error.Error].ok{Track{handle: h}};
 }
 
 # destroy a track. stops playback immediately (no fade) without firing the
@@ -650,7 +651,7 @@ pub fun play_track(t: Track, opts: PlayOptions) err[error.Error] {
     if (!sel r.ok) { ret r; }
     val props: u32 = build_play_props(opts);
     if (props == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     val ok: u8 = mix.MIX_PlayTrack(t.handle, props);
     c.SDL_DestroyProperties(props);
@@ -661,7 +662,7 @@ pub fun play_track(t: Track, opts: PlayOptions) err[error.Error] {
 # frames using MIX_TrackMSToFrames before calling MIX_StopTrack (which takes
 # frames). a 0 fade_out_ms stops immediately
 # ---
-# t:          track to stop
+# t:           track to stop
 # fade_out_ms: fade-out duration in milliseconds
 pub fun stop_track(t: Track, fade_out_ms: i64) err[error.Error] {
     val r: err[error.Error] = track_ready(t);
@@ -716,10 +717,10 @@ pub fun is_paused(t: Track) bool {
 #      unknown
 pub fun get_track_remaining_ms(t: Track) res[i64, error.Error] {
     val r: err[error.Error] = track_ready(t);
-    if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[i64, error.Error].err{r.err}; }
     val frames: i64 = mix.MIX_GetTrackRemaining(t.handle);
-    if (frames < 0) { ret res[i64, error.Error].err{ error.Error.failed{} }; }
-    ret res[i64, error.Error].ok{ mix.MIX_TrackFramesToMS(t.handle, frames) };
+    if (frames < 0) { ret res[i64, error.Error].err{error.Error.failed{}}; }
+    ret res[i64, error.Error].ok{mix.MIX_TrackFramesToMS(t.handle, frames)};
 }
 
 # the current playback position in milliseconds
@@ -728,10 +729,10 @@ pub fun get_track_remaining_ms(t: Track) res[i64, error.Error] {
 # ret: position in milliseconds, or an error.Error on failure
 pub fun get_track_position_ms(t: Track) res[i64, error.Error] {
     val r: err[error.Error] = track_ready(t);
-    if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[i64, error.Error].err{r.err}; }
     val frames: i64 = mix.MIX_GetTrackPlaybackPosition(t.handle);
-    if (frames < 0) { ret res[i64, error.Error].err{ error.Error.failed{} }; }
-    ret res[i64, error.Error].ok{ mix.MIX_TrackFramesToMS(t.handle, frames) };
+    if (frames < 0) { ret res[i64, error.Error].err{error.Error.failed{}}; }
+    ret res[i64, error.Error].ok{mix.MIX_TrackFramesToMS(t.handle, frames)};
 }
 
 # seek to a position in milliseconds. a paused track resumes from there.
@@ -806,7 +807,7 @@ pub fun get_track_loops(t: Track) i32 {
 pub fun set_track_stereo(t: Track, left: f32, right: f32) err[error.Error] {
     val r: err[error.Error] = track_ready(t);
     if (!sel r.ok) { ret r; }
-    var gains: mix.StereoGains = mix.StereoGains{ left: left, right: right };
+    var gains: mix.StereoGains = mix.StereoGains{left: left, right: right};
     ret to_err(mix.MIX_SetTrackStereo(t.handle, ?gains));
 }
 
@@ -834,7 +835,7 @@ pub fun set_track_pan(t: Track, pan: f32) err[error.Error] {
 pub fun set_track_3d_position(t: Track, p: Position) err[error.Error] {
     val r: err[error.Error] = track_ready(t);
     if (!sel r.ok) { ret r; }
-    var pos: mix.Point3D = mix.Point3D{ x: p.x, y: p.y, z: p.z };
+    var pos: mix.Point3D = mix.Point3D{x: p.x, y: p.y, z: p.z};
     ret to_err(mix.MIX_SetTrack3DPosition(t.handle, ?pos));
 }
 
@@ -844,12 +845,12 @@ pub fun set_track_3d_position(t: Track, p: Position) err[error.Error] {
 # ret: the position, or an error.Error on failure
 pub fun get_track_3d_position(t: Track) res[Position, error.Error] {
     val r: err[error.Error] = track_ready(t);
-    if (sel r.err) { ret res[Position, error.Error].err{ r.err }; }
-    var pos: mix.Point3D = mix.Point3D{ x: 0.0, y: 0.0, z: 0.0 };
+    if (sel r.err) { ret res[Position, error.Error].err{r.err}; }
+    var pos: mix.Point3D = mix.Point3D{x: 0.0, y: 0.0, z: 0.0};
     if (mix.MIX_GetTrack3DPosition(t.handle, ?pos) == 0) {
-        ret res[Position, error.Error].err{ error.Error.failed{} };
+        ret res[Position, error.Error].err{error.Error.failed{}};
     }
-    ret res[Position, error.Error].ok{ Position{ x: pos.x, y: pos.y, z: pos.z } };
+    ret res[Position, error.Error].ok{Position{x: pos.x, y: pos.y, z: pos.z}};
 }
 
 # how many sample frames the track is fading. negative = fading out,
@@ -882,12 +883,12 @@ pub fun tag_track(t: Track, tag: str) err[error.Error] {
 # ret: the new Group, or an error.Error on failure
 pub fun create_group(m: Mixer) res[Group, error.Error] {
     val r: err[error.Error] = mixer_ready(m);
-    if (sel r.err) { ret res[Group, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[Group, error.Error].err{r.err}; }
     val h: ptr = mix.MIX_CreateGroup(m.handle);
     if (h == nil) {
-        ret res[Group, error.Error].err{ error.Error.failed{} };
+        ret res[Group, error.Error].err{error.Error.failed{}};
     }
-    ret res[Group, error.Error].ok{ Group{ handle: h } };
+    ret res[Group, error.Error].ok{Group{handle: h}};
 }
 
 # destroy a group. safe on a nil handle
@@ -921,7 +922,7 @@ pub fun play_tag(m: Mixer, tag: str, opts: PlayOptions) err[error.Error] {
     if (!sel r.ok) { ret r; }
     val props: u32 = build_play_props(opts);
     if (props == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     val ok: u8 = mix.MIX_PlayTag(m.handle, tag, props);
     c.SDL_DestroyProperties(props);
@@ -930,8 +931,8 @@ pub fun play_tag(m: Mixer, tag: str, opts: PlayOptions) err[error.Error] {
 
 # stop all tracks with a given tag
 # ---
-# m:          mixer that owns the tracks
-# tag:        tag string to target
+# m:           mixer that owns the tracks
+# tag:         tag string to target
 # fade_out_ms: fade-out duration in milliseconds
 pub fun stop_tag(m: Mixer, tag: str, fade_out_ms: i64) err[error.Error] {
     val r: err[error.Error] = mixer_ready(m);
@@ -980,9 +981,9 @@ pub fun set_tag_gain(m: Mixer, tag: str, gain: f32) err[error.Error] {
 pub fun create_decoder(path: str) res[Decoder, error.Error] {
     val h: ptr = mix.MIX_CreateAudioDecoder(path, 0);
     if (h == nil) {
-        ret res[Decoder, error.Error].err{ error.Error.failed{} };
+        ret res[Decoder, error.Error].err{error.Error.failed{}};
     }
-    ret res[Decoder, error.Error].ok{ Decoder{ handle: h } };
+    ret res[Decoder, error.Error].ok{Decoder{handle: h}};
 }
 
 # destroy a decoder. safe on a nil handle
@@ -1000,10 +1001,10 @@ pub fun destroy_decoder(d: Decoder) {
 # ret: the spec, or an error.Error on failure
 pub fun get_decoder_format(d: Decoder) res[Spec, error.Error] {
     val r: err[error.Error] = decoder_ready(d);
-    if (sel r.err) { ret res[Spec, error.Error].err{ r.err }; }
-    var raw: c.AudioSpec = c.AudioSpec{ format: 0, channels: 0, freq: 0 };
+    if (sel r.err) { ret res[Spec, error.Error].err{r.err}; }
+    var raw: c.AudioSpec = c.AudioSpec{format: 0, channels: 0, freq: 0};
     if (mix.MIX_GetAudioDecoderFormat(d.handle, ?raw) == 0) {
-        ret res[Spec, error.Error].err{ error.Error.failed{} };
+        ret res[Spec, error.Error].err{error.Error.failed{}};
     }
     ret raw_to_spec(raw);
 }
@@ -1025,11 +1026,11 @@ pub fun decode(d: Decoder, buf: ptr, buflen: i32, spec: *c.AudioSpec) i32 {
 # --- tests ---
 
 test mixer__invalid_handles_rejected {
-    val nm: Mixer   = Mixer{   handle: nil };
-    val na: Audio   = Audio{   handle: nil };
-    val nt: Track   = Track{   handle: nil };
-    val ng: Group   = Group{   handle: nil };
-    val nd: Decoder = Decoder{ handle: nil };
+    val nm: Mixer   = Mixer{handle: nil};
+    val na: Audio   = Audio{handle: nil};
+    val nt: Track   = Track{handle: nil};
+    val ng: Group   = Group{handle: nil};
+    val nd: Decoder = Decoder{handle: nil};
 
     if (is_mixer_valid(nm))   { ret 1; }
     if (is_audio_valid(na))   { ret 2; }
@@ -1057,19 +1058,19 @@ test mixer__invalid_handles_rejected {
 
 test mixer__pan_formula {
     val center: mix.StereoGains = pan_gains(0.0);
-    if (center.left  != 1.0) { ret 1; }
+    if (center.left != 1.0)  { ret 1; }
     if (center.right != 1.0) { ret 2; }
 
     val full_right: mix.StereoGains = pan_gains(1.0);
-    if (full_right.left  != 0.0) { ret 3; }
+    if (full_right.left != 0.0)  { ret 3; }
     if (full_right.right != 1.0) { ret 4; }
 
     val full_left: mix.StereoGains = pan_gains(0.0 - 1.0);
-    if (full_left.left  != 1.0) { ret 5; }
+    if (full_left.left != 1.0)  { ret 5; }
     if (full_left.right != 0.0) { ret 6; }
 
     val half_right: mix.StereoGains = pan_gains(0.5);
-    if (half_right.left  != 0.5) { ret 7; }
+    if (half_right.left != 0.5)  { ret 7; }
     if (half_right.right != 1.0) { ret 8; }
 
     ret 0;
@@ -1077,27 +1078,28 @@ test mixer__pan_formula {
 
 test mixer__default_options {
     val opts: PlayOptions = default_options();
-    if (opts.loops     != 0)       { ret 1; }
-    if (opts.max_ms    != (0 - 1)) { ret 2; }
-    if (opts.start_ms  != 0)       { ret 3; }
+    if (opts.loops != 0)           { ret 1; }
+    if (opts.max_ms != (0 - 1))    { ret 2; }
+    if (opts.start_ms != 0)        { ret 3; }
     if (opts.fade_in_ms != 0)      { ret 4; }
     if (!opts.halt_when_exhausted) { ret 5; }
     ret 0;
 }
 
 test mixer__spec_round_trip {
-    val raw: c.AudioSpec = c.AudioSpec{ format: c.AUDIO_FORMAT_F32, channels: 2, freq: 44100 };
-    val s: res[Spec, error.Error] = raw_to_spec(raw);
-    if (!sel s.ok) { ret 1; }
-    if (s.ok.channels != 2)     { ret 2; }
-    if (s.ok.freq     != 44100) { ret 3; }
+    val raw: c.AudioSpec            = c.AudioSpec{format: c.AUDIO_FORMAT_F32, channels: 2, freq: 44100};
+    val s:   res[Spec, error.Error] = raw_to_spec(raw);
+    if (!sel s.ok)          { ret 1; }
+    if (s.ok.channels != 2) { ret 2; }
+    if (s.ok.freq != 44100) { ret 3; }
 
-    val bad_raw: c.AudioSpec = c.AudioSpec{ format: 0, channels: 2, freq: 44100 };
-    val bad: res[Spec, error.Error] = raw_to_spec(bad_raw);
+    val bad_raw: c.AudioSpec            = c.AudioSpec{format: 0, channels: 2, freq: 44100};
+    val bad:     res[Spec, error.Error] = raw_to_spec(bad_raw);
     if (sel bad.err) {
         val e: error.Error = bad.err;
         if (!sel e.unsupported) { ret 5; }
-    } or {
+    }
+    or {
         ret 4;
     }
     ret 0;

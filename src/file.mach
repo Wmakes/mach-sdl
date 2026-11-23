@@ -51,7 +51,7 @@ pub fun is_valid(stream: Stream) bool {
 # stream: stream the caller is about to use
 fun ready(stream: Stream) err[error.Error] {
     if (!is_valid(stream)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
@@ -61,7 +61,7 @@ fun ready(stream: Stream) err[error.Error] {
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -73,9 +73,9 @@ fun to_err(succeeded: u8) err[error.Error] {
 pub fun open_read(path: str) res[Stream, error.Error] {
     val handle: ptr = c.SDL_IOFromFile(path::*u8, "rb");
     if (handle == nil) {
-        ret res[Stream, error.Error].err{ error.Error.failed{} };
+        ret res[Stream, error.Error].err{error.Error.failed{}};
     }
-    ret res[Stream, error.Error].ok{ Stream{ handle: handle } };
+    ret res[Stream, error.Error].ok{Stream{handle: handle}};
 }
 
 # open a file for writing. creates it if it does not exist, truncates if it does
@@ -85,9 +85,9 @@ pub fun open_read(path: str) res[Stream, error.Error] {
 pub fun open_write(path: str) res[Stream, error.Error] {
     val handle: ptr = c.SDL_IOFromFile(path::*u8, "wb");
     if (handle == nil) {
-        ret res[Stream, error.Error].err{ error.Error.failed{} };
+        ret res[Stream, error.Error].err{error.Error.failed{}};
     }
-    ret res[Stream, error.Error].ok{ Stream{ handle: handle } };
+    ret res[Stream, error.Error].ok{Stream{handle: handle}};
 }
 
 # open a file for appending. creates it if it does not exist
@@ -97,9 +97,9 @@ pub fun open_write(path: str) res[Stream, error.Error] {
 pub fun open_append(path: str) res[Stream, error.Error] {
     val handle: ptr = c.SDL_IOFromFile(path::*u8, "ab");
     if (handle == nil) {
-        ret res[Stream, error.Error].err{ error.Error.failed{} };
+        ret res[Stream, error.Error].err{error.Error.failed{}};
     }
-    ret res[Stream, error.Error].ok{ Stream{ handle: handle } };
+    ret res[Stream, error.Error].ok{Stream{handle: handle}};
 }
 
 # open a file for both reading and writing. does not truncate. creates it if
@@ -110,9 +110,9 @@ pub fun open_append(path: str) res[Stream, error.Error] {
 pub fun open_read_write(path: str) res[Stream, error.Error] {
     val handle: ptr = c.SDL_IOFromFile(path::*u8, "r+b");
     if (handle == nil) {
-        ret res[Stream, error.Error].err{ error.Error.failed{} };
+        ret res[Stream, error.Error].err{error.Error.failed{}};
     }
-    ret res[Stream, error.Error].ok{ Stream{ handle: handle } };
+    ret res[Stream, error.Error].ok{Stream{handle: handle}};
 }
 
 # close a stream. safe on an invalid handle
@@ -133,9 +133,9 @@ pub fun close(stream: Stream) {
 #         error.Error.failed (text from error.message())
 pub fun read(stream: Stream, buf: *u8, count: usize) res[usize, error.Error] {
     val r: err[error.Error] = ready(stream);
-    if (sel r.err) { ret res[usize, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[usize, error.Error].err{r.err}; }
     val n: usize = c.SDL_ReadIO(stream.handle, buf::ptr, count);
-    ret res[usize, error.Error].ok{ n };
+    ret res[usize, error.Error].ok{n};
 }
 
 # write count bytes from a buffer
@@ -147,9 +147,9 @@ pub fun read(stream: Stream, buf: *u8, count: usize) res[usize, error.Error] {
 #         error.Error.failed (text from error.message())
 pub fun write(stream: Stream, data: *u8, count: usize) res[usize, error.Error] {
     val r: err[error.Error] = ready(stream);
-    if (sel r.err) { ret res[usize, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[usize, error.Error].err{r.err}; }
     val n: usize = c.SDL_WriteIO(stream.handle, data::ptr, count);
-    ret res[usize, error.Error].ok{ n };
+    ret res[usize, error.Error].ok{n};
 }
 
 # seek to a position in the file
@@ -161,12 +161,12 @@ pub fun write(stream: Stream, data: *u8, count: usize) res[usize, error.Error] {
 #         error.Error.failed (text from error.message())
 pub fun seek(stream: Stream, offset: i64, whence: i32) res[i64, error.Error] {
     val r: err[error.Error] = ready(stream);
-    if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[i64, error.Error].err{r.err}; }
     val pos: i64 = c.SDL_SeekIO(stream.handle, offset, whence);
     if (pos < 0) {
-        ret res[i64, error.Error].err{ error.Error.failed{} };
+        ret res[i64, error.Error].err{error.Error.failed{}};
     }
-    ret res[i64, error.Error].ok{ pos };
+    ret res[i64, error.Error].ok{pos};
 }
 
 # the current position in the file
@@ -176,12 +176,12 @@ pub fun seek(stream: Stream, offset: i64, whence: i32) res[i64, error.Error] {
 #         error.Error.failed (text from error.message())
 pub fun tell(stream: Stream) res[i64, error.Error] {
     val r: err[error.Error] = ready(stream);
-    if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[i64, error.Error].err{r.err}; }
     val pos: i64 = c.SDL_TellIO(stream.handle);
     if (pos < 0) {
-        ret res[i64, error.Error].err{ error.Error.failed{} };
+        ret res[i64, error.Error].err{error.Error.failed{}};
     }
-    ret res[i64, error.Error].ok{ pos };
+    ret res[i64, error.Error].ok{pos};
 }
 
 # the total size of the file
@@ -191,12 +191,12 @@ pub fun tell(stream: Stream) res[i64, error.Error] {
 #         error.Error.failed (text from error.message())
 pub fun size(stream: Stream) res[i64, error.Error] {
     val r: err[error.Error] = ready(stream);
-    if (sel r.err) { ret res[i64, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[i64, error.Error].err{r.err}; }
     val sz: i64 = c.SDL_GetIOSize(stream.handle);
     if (sz < 0) {
-        ret res[i64, error.Error].err{ error.Error.failed{} };
+        ret res[i64, error.Error].err{error.Error.failed{}};
     }
-    ret res[i64, error.Error].ok{ sz };
+    ret res[i64, error.Error].ok{sz};
 }
 
 # delete a file or empty directory
@@ -271,10 +271,10 @@ pub rec Matches {
 pub fun base_path() res[str, error.Error] {
     val raw: *u8 = c.SDL_GetBasePath();
     if (raw == nil) {
-        ret res[str, error.Error].err{ error.Error.failed{} };
+        ret res[str, error.Error].err{error.Error.failed{}};
     }
     val s: str = raw;
-    ret res[str, error.Error].ok{ s };
+    ret res[str, error.Error].ok{s};
 }
 
 # a folder where the application may write its own data. SDL creates it if
@@ -286,10 +286,10 @@ pub fun base_path() res[str, error.Error] {
 pub fun pref_path(org: str, app: str) res[str, error.Error] {
     val raw: *u8 = c.SDL_GetPrefPath(org::*u8, app::*u8);
     if (raw == nil) {
-        ret res[str, error.Error].err{ error.Error.failed{} };
+        ret res[str, error.Error].err{error.Error.failed{}};
     }
     val s: str = raw;
-    ret res[str, error.Error].ok{ s };
+    ret res[str, error.Error].ok{s};
 }
 
 # release a string returned by pref_path
@@ -306,10 +306,10 @@ pub fun free_path(path: str) {
 pub fun user_folder(folder: i32) res[str, error.Error] {
     val raw: *u8 = c.SDL_GetUserFolder(folder);
     if (raw == nil) {
-        ret res[str, error.Error].err{ error.Error.failed{} };
+        ret res[str, error.Error].err{error.Error.failed{}};
     }
     val s: str = raw;
-    ret res[str, error.Error].ok{ s };
+    ret res[str, error.Error].ok{s};
 }
 
 # create a directory and any missing parents. succeeds if it already exists
@@ -346,19 +346,19 @@ pub fun copy(old_path: str, new_path: str) err[error.Error] {
 pub fun path_info(path: str) res[PathInfo, error.Error] {
     var raw: c.PathInfo;
     if (c.SDL_GetPathInfo(path::*u8, ?raw) == 0) {
-        ret res[PathInfo, error.Error].err{ error.Error.failed{} };
+        ret res[PathInfo, error.Error].err{error.Error.failed{}};
     }
     var kind: PathType = PathType.other{};
     if (raw.path_type == 0) { kind = PathType.none{}; }
     if (raw.path_type == 1) { kind = PathType.file{}; }
     if (raw.path_type == 2) { kind = PathType.directory{}; }
-    ret res[PathInfo, error.Error].ok{ PathInfo{
+    ret res[PathInfo, error.Error].ok{PathInfo{
         kind:        kind,
         size:        raw.size,
         create_time: raw.create_time,
         modify_time: raw.modify_time,
         access_time: raw.access_time
-    } };
+    }};
 }
 
 # whether a path exists (file, directory or other)
@@ -400,13 +400,13 @@ pub fun is_directory(path: str) bool {
 # ret:     the Matches (possibly empty), or error.Error.failed
 pub fun glob(path: str, pattern: str, flags: u32) res[Matches, error.Error] {
     var count: i32 = 0;
-    var pat: *u8 = pattern::*u8;
+    var pat:   *u8 = pattern::*u8;
     if (pattern[0] == 0) { pat = nil; }
     val list: **u8 = c.SDL_GlobDirectory(path::*u8, pat, flags, ?count);
     if (list == nil) {
-        ret res[Matches, error.Error].err{ error.Error.failed{} };
+        ret res[Matches, error.Error].err{error.Error.failed{}};
     }
-    ret res[Matches, error.Error].ok{ Matches{ list: list, count: count } };
+    ret res[Matches, error.Error].ok{Matches{list: list, count: count}};
 }
 
 # one entry of a glob result. the string is borrowed from the list: it is
@@ -420,7 +420,7 @@ pub fun entry(m: Matches, index: i32) opt[str] {
         ret opt[str].none{};
     }
     val s: str = m.list[index];
-    ret opt[str].some{ s };
+    ret opt[str].some{s};
 }
 
 # release a glob result. safe to call on the zero value

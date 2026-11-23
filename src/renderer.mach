@@ -74,7 +74,7 @@ pub tag Flip: u8 {
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -92,7 +92,7 @@ pub fun is_valid(rend: Renderer) bool {
 # rend: renderer the caller is about to use
 fun ready(rend: Renderer) err[error.Error] {
     if (!is_valid(rend)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
@@ -105,7 +105,7 @@ fun ready_with(rend: Renderer, tex: Texture) err[error.Error] {
     val r: err[error.Error] = ready(rend);
     if (!sel r.ok) { ret r; }
     if (tex.handle == nil) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
@@ -128,14 +128,14 @@ pub fun blend_to_raw(mode: Blend) u32 {
 # raw: SDL blend mode value
 # ret: the Blend, or error.Error.unsupported for a custom SDL blend mode
 pub fun blend_from_raw(raw: u32) res[Blend, error.Error] {
-    if (raw == c.BLENDMODE_NONE)                { ret res[Blend, error.Error].ok{ Blend.none{} }; }
-    if (raw == c.BLENDMODE_BLEND)               { ret res[Blend, error.Error].ok{ Blend.blend{} }; }
-    if (raw == c.BLENDMODE_BLEND_PREMULTIPLIED) { ret res[Blend, error.Error].ok{ Blend.blend_premultiplied{} }; }
-    if (raw == c.BLENDMODE_ADD)                 { ret res[Blend, error.Error].ok{ Blend.add{} }; }
-    if (raw == c.BLENDMODE_ADD_PREMULTIPLIED)   { ret res[Blend, error.Error].ok{ Blend.add_premultiplied{} }; }
-    if (raw == c.BLENDMODE_MOD)                 { ret res[Blend, error.Error].ok{ Blend.mod{} }; }
-    if (raw == c.BLENDMODE_MUL)                 { ret res[Blend, error.Error].ok{ Blend.mul{} }; }
-    ret res[Blend, error.Error].err{ error.Error.unsupported{} };
+    if (raw == c.BLENDMODE_NONE)                { ret res[Blend, error.Error].ok{Blend.none{}}; }
+    if (raw == c.BLENDMODE_BLEND)               { ret res[Blend, error.Error].ok{Blend.blend{}}; }
+    if (raw == c.BLENDMODE_BLEND_PREMULTIPLIED) { ret res[Blend, error.Error].ok{Blend.blend_premultiplied{}}; }
+    if (raw == c.BLENDMODE_ADD)                 { ret res[Blend, error.Error].ok{Blend.add{}}; }
+    if (raw == c.BLENDMODE_ADD_PREMULTIPLIED)   { ret res[Blend, error.Error].ok{Blend.add_premultiplied{}}; }
+    if (raw == c.BLENDMODE_MOD)                 { ret res[Blend, error.Error].ok{Blend.mod{}}; }
+    if (raw == c.BLENDMODE_MUL)                 { ret res[Blend, error.Error].ok{Blend.mul{}}; }
+    ret res[Blend, error.Error].err{error.Error.unsupported{}};
 }
 
 # the SDL_FlipMode value of a Flip
@@ -154,13 +154,13 @@ fun flip_to_raw(flip: Flip) u32 {
 #      error.Error.failed (text from error.message())
 pub fun create(win: window.Window) res[Renderer, error.Error] {
     if (!window.is_valid(win)) {
-        ret res[Renderer, error.Error].err{ error.Error.invalid{} };
+        ret res[Renderer, error.Error].err{error.Error.invalid{}};
     }
     val handle: ptr = c.SDL_CreateRenderer(win.handle, nil);
     if (handle == nil) {
-        ret res[Renderer, error.Error].err{ error.Error.failed{} };
+        ret res[Renderer, error.Error].err{error.Error.failed{}};
     }
-    ret res[Renderer, error.Error].ok{ Renderer{ handle: handle } };
+    ret res[Renderer, error.Error].ok{Renderer{handle: handle}};
 }
 
 # destroy a renderer and the textures made with it. safe on an invalid handle
@@ -276,13 +276,13 @@ pub fun fill_rects(rend: Renderer, rects: *FRect, count: usize) err[error.Error]
 #       error.Error.failed (text from error.message())
 pub fun read_pixels(rend: Renderer) res[surface.Surface, error.Error] {
     if (!is_valid(rend)) {
-        ret res[surface.Surface, error.Error].err{ error.Error.invalid{} };
+        ret res[surface.Surface, error.Error].err{error.Error.invalid{}};
     }
     val handle: ptr = c.SDL_RenderReadPixels(rend.handle, nil);
     if (handle == nil) {
-        ret res[surface.Surface, error.Error].err{ error.Error.failed{} };
+        ret res[surface.Surface, error.Error].err{error.Error.failed{}};
     }
-    ret res[surface.Surface, error.Error].ok{ surface.Surface{ handle: handle } };
+    ret res[surface.Surface, error.Error].ok{surface.Surface{handle: handle}};
 }
 
 # draw into a texture instead of the window, until reset_target. the
@@ -329,7 +329,7 @@ pub fun clear_clip(rend: Renderer) err[error.Error] {
 # rend: renderer to query
 # ret:  the clip rectangle. all zero when none is set or the handle is invalid
 pub fun clip(rend: Renderer) Rect {
-    var rc: Rect = Rect{ x: 0, y: 0, w: 0, h: 0 };
+    var rc: Rect = Rect{x: 0, y: 0, w: 0, h: 0};
     if (is_valid(rend)) {
         c.SDL_GetRenderClipRect(rend.handle, (?rc)::*c.Rect);
     }
@@ -357,7 +357,7 @@ pub fun scale(rend: Renderer) FPoint {
     if (is_valid(rend)) {
         c.SDL_GetRenderScale(rend.handle, ?x, ?y);
     }
-    ret FPoint{ x: x, y: y };
+    ret FPoint{x: x, y: y};
 }
 
 # set how drawing combines with what is already on the target
@@ -390,9 +390,9 @@ pub fun draw_texture(rend: Renderer, tex: Texture, dst: FRect) err[error.Error] 
 # center: rotation point, relative to the top-left of dst
 # flip:   mirroring, applied before the rotation
 pub fun draw_texture_rotated(rend: Renderer, tex: Texture, dst: FRect,
-                             angle: f64, center: FPoint, flip: Flip) err[error.Error] {
+    angle: f64, center: FPoint, flip: Flip) err[error.Error] {
     val r: err[error.Error] = ready_with(rend, tex);
     if (!sel r.ok) { ret r; }
     ret to_err(c.SDL_RenderTextureRotated(rend.handle, tex.handle, nil, (?dst)::*c.FRect,
-                                          angle, (?center)::*c.FPoint, flip_to_raw(flip)));
+        angle, (?center)::*c.FPoint, flip_to_raw(flip)));
 }

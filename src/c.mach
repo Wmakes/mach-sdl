@@ -17,6 +17,14 @@
 # unwrapped with `!= 0` in the wrapper modules.
 
 use std.types.size.usize;
+use std.types.string.str;
+
+$if ($mach.build.sys == $mach.sys.windows) {
+    val SDL: str = "sdl-win";
+}
+$or {
+    val SDL: str = "sdl";
+}
 
 # --- SDL_init.h ---
 
@@ -26,9 +34,9 @@ pub val INIT_EVENTS: u32 = 0x00004000;
 # implies the joystick subsystem, which implies EVENTS
 pub val INIT_GAMEPAD: u32 = 0x00002000;
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_Init(flags: u32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_Quit();
 
 # hints -- SDL_SetHint("SDL_VIDEO_DRIVER", "dummy") forces the headless
@@ -38,12 +46,12 @@ pub ext fun SDL_Quit();
 
 # set an SDL hint (configuration variable) by name. call before the
 # subsystem it affects is initialized
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetHint(name: *u8, value: *u8) u8;
 
 # --- SDL_error.h ---
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetError() *u8;
 
 # --- SDL_video.h ---
@@ -51,20 +59,20 @@ pub ext fun SDL_GetError() *u8;
 pub val WINDOW_OPENGL:    u64 = 0x0000000000000002;
 pub val WINDOW_RESIZABLE: u64 = 0x0000000000000020;
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_CreateWindow(title: *u8, w: i32, h: i32, flags: u64) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_DestroyWindow(window: ptr);
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GL_CreateContext(window: ptr) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GL_MakeCurrent(window: ptr, context: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GL_SwapWindow(window: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GL_GetProcAddress(proc: *u8) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GL_DestroyContext(context: ptr) u8;
 
 # --- SDL_events.h ---
@@ -108,7 +116,7 @@ pub rec KeyboardEvent {
     repeat:     u8;
 }
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_PollEvent(event: *Event) u8;
 
 test sdl_c_keyboardevent_layout_is_40_bytes {
@@ -150,13 +158,13 @@ pub val BUTTON_RIGHT:  u8 = 3;
 pub val BUTTON_X1:     u8 = 4;
 pub val BUTTON_X2:     u8 = 5;
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetMouseState(x: *f32, y: *f32) u32;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_WarpMouseInWindow(window: ptr, x: f32, y: f32);
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_ShowCursor() u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_HideCursor() u8;
 
 pub val EVENT_MOUSE_MOTION:      u32 = 0x400;
@@ -256,9 +264,9 @@ test sdl_c_textinputevent_layout_is_32_bytes {
     ret 0;
 }
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_StartTextInput(window: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_StopTextInput(window: ptr) u8;
 
 # --- SDL_timer.h ---
@@ -266,15 +274,15 @@ pub ext fun SDL_StopTextInput(window: ptr) u8;
 # no structs here -- every function is a plain scalar in, scalar out, so
 # there's nothing to get an ABI layout wrong on.
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetTicks() u64;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetTicksNS() u64;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetPerformanceCounter() u64;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetPerformanceFrequency() u64;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_Delay(ms: u32);
 
 # --- SDL_rect.h ---
@@ -303,21 +311,21 @@ test sdl_c_frect_layout_is_16_bytes {
 # SDL_CreateRenderer and SDL_GL_CreateContext both claim the window's
 # drawable surface.
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_CreateRenderer(window: ptr, name: *u8) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_DestroyRenderer(renderer: ptr);
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetRenderDrawColor(renderer: ptr, r: u8, g: u8, b: u8, a: u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderClear(renderer: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderFillRect(renderer: ptr, rect: *FRect) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderRect(renderer: ptr, rect: *FRect) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderLine(renderer: ptr, x1: f32, y1: f32, x2: f32, y2: f32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderPresent(renderer: ptr) u8;
 
 # --- SDL_audio.h ---
@@ -364,15 +372,15 @@ test sdl_c_audiospec_layout_is_12_bytes {
 
 # open the device and a stream bound to it. pass nil for callback and
 # userdata
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_OpenAudioDeviceStream(devid: u32, spec: *AudioSpec, callback: ptr, userdata: ptr) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_PutAudioStreamData(stream: ptr, buf: ptr, len: i32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_ResumeAudioStreamDevice(stream: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_PauseAudioStreamDevice(stream: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_DestroyAudioStream(stream: ptr);
 
 # --- audio stream queries + device enumeration (SDL_audio.h) ---
@@ -383,18 +391,18 @@ pub ext fun SDL_DestroyAudioStream(stream: ptr);
 # array of device IDs -- caller must free with SDL_free. SDL_GetAudioDeviceName
 # returns a pointer to an internal string (no copy needed, no free needed).
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetAudioStreamAvailable(stream: ptr) i32;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_ClearAudioStream(stream: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetAudioPlaybackDevices(count: *i32) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetAudioDeviceName(devid: u32) *u8;
 
 # SDL_LoadWAV reads a WAV file: it fills spec, hands back a heap buffer in
 # audio_buf (caller must SDL_free it) and its byte length in audio_len.
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_LoadWAV(path: *u8, spec: *AudioSpec, audio_buf: *ptr, audio_len: *u32) u8;
 
 # --- textures (SDL_surface.h / SDL_render.h) ---
@@ -411,22 +419,22 @@ pub val TEXTUREACCESS_TARGET:    i32 = 2;
 
 pub val PIXELFORMAT_RGBA8888: u32 = 0x16462004;
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_LoadBMP(file: *u8) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_DestroySurface(surface: ptr);
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_CreateTextureFromSurface(renderer: ptr, surface: ptr) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_CreateTexture(renderer: ptr, format: u32, access: i32, w: i32, h: i32) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_DestroyTexture(texture: ptr);
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetTextureSize(texture: ptr, w: *f32, h: *f32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderTexture(renderer: ptr, texture: ptr, srcrect: *FRect, dstrect: *FRect) u8;
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderTextureRotated(renderer: ptr, texture: ptr, srcrect: *FRect, dstrect: *FRect, angle: f64, center: *FPoint, flip: u32) u8;
 
 # --- scale mode + flip mode (SDL_surface.h) ---
@@ -446,44 +454,44 @@ pub val FLIP_VERTICAL:   u32 = 2;
 # these are independent of the renderer-level draw blend mode set by
 # SDL_SetRenderDrawBlendMode further down.
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetTextureBlendMode(texture: ptr, blend_mode: u32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetTextureBlendMode(texture: ptr, blend_mode: *u32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetTextureColorMod(texture: ptr, r: u8, g: u8, b: u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetTextureColorMod(texture: ptr, r: *u8, g: *u8, b: *u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetTextureAlphaMod(texture: ptr, alpha: u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetTextureAlphaMod(texture: ptr, alpha: *u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetTextureScaleMode(texture: ptr, scale_mode: u32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetTextureScaleMode(texture: ptr, scale_mode: *u32) u8;
 
 # --- more window management (SDL_video.h) ---
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetWindowTitle(window: ptr, title: *u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetWindowSize(window: ptr, w: *i32, h: *i32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetWindowSize(window: ptr, w: i32, h: i32) u8;
 
 # --- keyboard state (SDL_keyboard.h) ---
 
 # returns SDL's own key state array, indexed by scancode; numkeys receives its length
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetKeyboardState(numkeys: *i32) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetModState() u16;
 # --- window position + fullscreen (SDL_video.h) ---
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetWindowPosition(window: ptr, x: i32, y: i32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetWindowFullscreen(window: ptr, fullscreen: u8) u8;
 
 # --- rect intersection (SDL_rect.h) ---
@@ -493,18 +501,18 @@ pub ext fun SDL_SetWindowFullscreen(window: ptr, fullscreen: u8) u8;
 # no symbol to ext-fun against. Reimplemented directly in rect.mach
 # instead (it's simple comparison logic, not worth an FFI call anyway).
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_HasRectIntersectionFloat(a: *FRect, b: *FRect) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetRectIntersectionFloat(a: *FRect, b: *FRect, result: *FRect) u8;
 
 # --- random (SDL_stdinc.h) ---
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_srand(seed: u64);
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_rand(n: i32) i32;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_randf() f32;
 
 # --- message box (SDL_messagebox.h) ---
@@ -513,7 +521,7 @@ pub val MESSAGEBOX_ERROR:       u32 = 0x00000010;
 pub val MESSAGEBOX_WARNING:     u32 = 0x00000020;
 pub val MESSAGEBOX_INFORMATION: u32 = 0x00000040;
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_ShowSimpleMessageBox(flags: u32, title: *u8, message: *u8, window: ptr) u8;
 
 # --- blend modes (SDL_blendmode.h) ---
@@ -530,7 +538,7 @@ pub val BLENDMODE_ADD_PREMULTIPLIED:   u32 = 0x00000020;
 pub val BLENDMODE_MOD:                 u32 = 0x00000004;
 pub val BLENDMODE_MUL:                 u32 = 0x00000008;
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetRenderDrawBlendMode(renderer: ptr, blend_mode: u32) u8;
 
 # --- render target (SDL_render.h) ---
@@ -540,7 +548,7 @@ pub ext fun SDL_SetRenderDrawBlendMode(renderer: ptr, blend_mode: u32) u8;
 # a texture passed here must have been created with render-target access
 # (SDL_CreateTexture + TEXTUREACCESS_TARGET). sdl.texture.create does that.
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetRenderTarget(renderer: ptr, texture: ptr) u8;
 
 # --- clip rect (SDL_rect.h / SDL_render.h) ---
@@ -563,16 +571,16 @@ test sdl_c_rect_layout_is_16_bytes {
     ret 0;
 }
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetRenderClipRect(renderer: ptr, rect: *Rect) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetRenderClipRect(renderer: ptr, rect: *Rect) u8;
 
 # --- render scale (SDL_render.h) ---
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetRenderScale(renderer: ptr, scale_x: f32, scale_y: f32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetRenderScale(renderer: ptr, scale_x: *f32, scale_y: *f32) u8;
 
 # --- bulk draws (SDL_render.h) ---
@@ -591,11 +599,11 @@ test sdl_c_fpoint_layout_is_8_bytes {
     ret 0;
 }
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderPoints(renderer: ptr, points: ptr, count: i32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderLines(renderer: ptr, points: ptr, count: i32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderFillRects(renderer: ptr, rects: ptr, count: i32) u8;
 
 # --- clipboard (SDL_clipboard.h) ---
@@ -605,11 +613,11 @@ pub ext fun SDL_RenderFillRects(renderer: ptr, rects: ptr, count: i32) u8;
 # must free it with SDL_free. Returns an empty string (never nil) on
 # failure too. See clipboard.mach's text/free_text.
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetClipboardText(text: *u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetClipboardText() *u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_HasClipboardText() u8;
 
 # --- memory (SDL_stdinc.h) ---
@@ -617,33 +625,33 @@ pub ext fun SDL_HasClipboardText() u8;
 # needed to free the string from SDL_GetClipboardText (clipboard.mach's
 # free_text).
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_free(mem: ptr);
 
 # --- mouse relative mode + capture (SDL_mouse.h) ---
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetWindowRelativeMouseMode(window: ptr, enabled: u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetWindowRelativeMouseMode(window: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetRelativeMouseState(x: *f32, y: *f32) u32;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_CaptureMouse(enabled: u8) u8;
 
 # --- window minimize/maximize/restore/raise + min/max size (SDL_video.h) ---
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_MinimizeWindow(window: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_MaximizeWindow(window: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RestoreWindow(window: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RaiseWindow(window: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetWindowMinimumSize(window: ptr, min_w: i32, min_h: i32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetWindowMaximumSize(window: ptr, max_w: i32, max_h: i32) u8;
 
 # --- glue for SDL_image (SDL_iostream.h, SDL_filesystem.h, SDL_render.h) ---
@@ -661,25 +669,25 @@ pub ext fun SDL_SetWindowMaximumSize(window: ptr, max_w: i32, max_h: i32) u8;
 #
 # SDL_RemovePath deletes a file or empty directory. true on success.
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_IOFromFile(file: *u8, mode: *u8) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_IOFromConstMem(mem: ptr, size: usize) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_CloseIO(context: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_ReadIO(context: ptr, ptr: ptr, size: usize) usize;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_WriteIO(context: ptr, ptr: ptr, size: usize) usize;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SeekIO(context: ptr, offset: i64, whence: i32) i64;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_TellIO(context: ptr) i64;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetIOSize(context: ptr) i64;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenderReadPixels(renderer: ptr, rect: *Rect) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RemovePath(path: *u8) u8;
 
 # --- filesystem (SDL_filesystem.h) ---
@@ -708,21 +716,21 @@ test sdl_c_pathinfo_layout_is_40_bytes {
     ret 0;
 }
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetBasePath() *u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetPrefPath(org: *u8, app: *u8) *u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetUserFolder(folder: i32) *u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_CreateDirectory(path: *u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RenamePath(old_path: *u8, new_path: *u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_CopyFile(old_path: *u8, new_path: *u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetPathInfo(path: *u8, info: *PathInfo) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GlobDirectory(path: *u8, pattern: *u8, flags: u32, count: *i32) **u8;
 
 # --- glue for SDL_mixer (SDL_properties.h) ---
@@ -733,15 +741,15 @@ pub ext fun SDL_GlobDirectory(path: *u8, pattern: *u8, flags: u32, count: *i32) 
 # typedef Uint32; 0 is the invalid ID (SDL_CreateProperties returns 0 on
 # failure). signatures verified against SDL_properties.h at release-3.2.0.
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_CreateProperties() u32;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetNumberProperty(props: u32, name: *u8, value: i64) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetBooleanProperty(props: u32, name: *u8, value: u8) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetFloatProperty(props: u32, name: *u8, value: f32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_DestroyProperties(props: u32);
 
 # --- SDL_gamepad.h ---
@@ -843,27 +851,27 @@ test sdl_c_gamepaddeviceevent_layout_is_24_bytes {
     ret 0;
 }
 
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetGamepads(count: *i32) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_IsGamepad(instance_id: u32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_OpenGamepad(instance_id: u32) ptr;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_CloseGamepad(gamepad: ptr);
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetGamepadID(gamepad: ptr) u32;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetGamepadName(gamepad: ptr) *u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GamepadConnected(gamepad: ptr) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetGamepadButton(gamepad: ptr, button: i32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_GetGamepadAxis(gamepad: ptr, axis: i32) i16;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RumbleGamepad(gamepad: ptr, low_frequency: u16, high_frequency: u16, duration_ms: u32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_RumbleGamepadTriggers(gamepad: ptr, left: u16, right: u16, duration_ms: u32) u8;
-#[library("sdl")]
+#[library(SDL)]
 pub ext fun SDL_SetGamepadLED(gamepad: ptr, red: u8, green: u8, blue: u8) u8;

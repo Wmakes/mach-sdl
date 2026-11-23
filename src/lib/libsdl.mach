@@ -131,4 +131,4 @@ fwd sdl.ttf;
 fwd sdl.wav;
 fwd sdl.window;
 
-fwd error.Error;
+fwd sdl.error.Error;

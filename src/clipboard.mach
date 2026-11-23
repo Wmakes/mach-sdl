@@ -18,7 +18,7 @@ use std.types.string.str;
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -50,10 +50,10 @@ pub fun set_text(text: str) err[error.Error] {
 pub fun text() res[str, error.Error] {
     val raw: *u8 = c.SDL_GetClipboardText();
     if (raw == nil) {
-        ret res[str, error.Error].err{ error.Error.failed{} };
+        ret res[str, error.Error].err{error.Error.failed{}};
     }
     val s: str = raw;
-    ret res[str, error.Error].ok{ s };
+    ret res[str, error.Error].ok{s};
 }
 
 # release a string returned by text()

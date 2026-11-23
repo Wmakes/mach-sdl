@@ -51,8 +51,8 @@ pub rec FRect {
 
 # whether two rectangles overlap
 # ---
-# a: first rectangle
-# b: second rectangle
+# a:   first rectangle
+# b:   second rectangle
 # ret: true if they share any area
 pub fun intersects(a: FRect, b: FRect) bool {
     ret c.SDL_HasRectIntersectionFloat((?a)::*c.FRect, (?b)::*c.FRect) != 0;
@@ -60,15 +60,15 @@ pub fun intersects(a: FRect, b: FRect) bool {
 
 # the overlapping region of two rectangles
 # ---
-# a: first rectangle
-# b: second rectangle
+# a:   first rectangle
+# b:   second rectangle
 # ret: the shared area, or none when they do not overlap
 pub fun intersection(a: FRect, b: FRect) opt[FRect] {
-    var result: FRect = FRect{ x: 0.0, y: 0.0, w: 0.0, h: 0.0 };
+    var result: FRect = FRect{x: 0.0, y: 0.0, w: 0.0, h: 0.0};
     if (c.SDL_GetRectIntersectionFloat((?a)::*c.FRect, (?b)::*c.FRect, (?result)::*c.FRect) == 0) {
         ret opt[FRect].none{};
     }
-    ret opt[FRect].some{ result };
+    ret opt[FRect].some{result};
 }
 
 # whether a point lies inside a rectangle. the left and top edges count as
@@ -76,8 +76,8 @@ pub fun intersection(a: FRect, b: FRect) opt[FRect] {
 # share an edge never both contain a point on it. (SDL's own
 # SDL_PointInRectFloat counts all four edges as inside.)
 # ---
-# r: rectangle to test against
-# p: point to test
+# r:   rectangle to test against
+# p:   point to test
 # ret: true if the point is inside
 pub fun contains(r: FRect, p: FPoint) bool {
     ret p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
@@ -104,26 +104,26 @@ test rect__frect_layout {
 }
 
 test rect__intersects_detects_overlap {
-    val a: FRect = FRect{ x: 0.0, y: 0.0, w: 10.0, h: 10.0 };
-    val b: FRect = FRect{ x: 5.0, y: 5.0, w: 10.0, h: 10.0 };
-    val far: FRect = FRect{ x: 100.0, y: 100.0, w: 10.0, h: 10.0 };
-    if (!intersects(a, b)) { ret 1; }
+    val a:   FRect = FRect{x: 0.0, y: 0.0, w: 10.0, h: 10.0};
+    val b:   FRect = FRect{x: 5.0, y: 5.0, w: 10.0, h: 10.0};
+    val far: FRect = FRect{x: 100.0, y: 100.0, w: 10.0, h: 10.0};
+    if (!intersects(a, b))  { ret 1; }
     if (intersects(a, far)) { ret 1; }
     ret 0;
 }
 
 test rect__intersection_is_none_without_overlap {
-    val a: FRect = FRect{ x: 0.0, y: 0.0, w: 10.0, h: 10.0 };
-    val far: FRect = FRect{ x: 100.0, y: 100.0, w: 10.0, h: 10.0 };
-    val r: opt[FRect] = intersection(a, far);
+    val a:   FRect      = FRect{x: 0.0, y: 0.0, w: 10.0, h: 10.0};
+    val far: FRect      = FRect{x: 100.0, y: 100.0, w: 10.0, h: 10.0};
+    val r:   opt[FRect] = intersection(a, far);
     if (sel r.some) { ret 1; }
     ret 0;
 }
 
 test rect__contains_includes_near_edge_excludes_far_edge {
-    val r: FRect = FRect{ x: 0.0, y: 0.0, w: 10.0, h: 10.0 };
-    if (!contains(r, FPoint{ x: 0.0, y: 0.0 })) { ret 1; }
-    if (contains(r, FPoint{ x: 10.0, y: 10.0 })) { ret 1; }
-    if (contains(r, FPoint{ x: -1.0, y: 5.0 })) { ret 1; }
+    val r: FRect = FRect{x: 0.0, y: 0.0, w: 10.0, h: 10.0};
+    if (!contains(r, FPoint{x: 0.0, y: 0.0}))  { ret 1; }
+    if (contains(r, FPoint{x: 10.0, y: 10.0})) { ret 1; }
+    if (contains(r, FPoint{x: -1.0, y: 5.0}))  { ret 1; }
     ret 0;
 }

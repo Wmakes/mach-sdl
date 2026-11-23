@@ -20,7 +20,7 @@ pub fun seed(s: u64) {
 
 # a random integer in [0, n)
 # ---
-# n: exclusive upper bound, must be greater than 0
+# n:   exclusive upper bound, must be greater than 0
 # ret: the number
 pub fun int(n: i32) i32 {
     ret c.SDL_rand(n);
@@ -35,8 +35,8 @@ pub fun f32() f32 {
 
 # a random float in [lo, hi)
 # ---
-# lo: inclusive lower bound
-# hi: exclusive upper bound
+# lo:  inclusive lower bound
+# hi:  exclusive upper bound
 # ret: the number
 pub fun range(lo: f32, hi: f32) f32 {
     ret lo + c.SDL_randf() * (hi - lo);

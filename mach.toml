@@ -1,49 +1,50 @@
 [project]
 id = "sdl"
-version = "1.1.1"
+version = "1.1.2"
 src = "src"
-out = "out/{target.name}/{profile.name}"
-mach = "^6"
+work = "out/{target.name}/{profile.name}"
+mach = "^7"
 
 [target.linux-x86_64]
-isa = "x86_64"
-os  = "linux"
+arch = "x86_64"
+sys  = "linux"
+env  = "gnu"
 abi = "sysv64"
 
 [target.linux-aarch64]
-isa = "aarch64"
-os  = "linux"
+arch = "aarch64"
+sys  = "linux"
+env  = "gnu"
 abi = "aapcs64"
 
 [target.windows]
-isa = "x86_64"
-os  = "windows"
+arch = "x86_64"
+sys  = "windows"
+env  = "msvc"
 abi = "win64"
 
 [target.darwin]
-isa = "x86_64"
-os  = "darwin"
+arch = "x86_64"
+sys  = "darwin"
+env  = "macos"
 abi = "sysv64"
 
 [target.darwin-aarch64]
-isa = "aarch64"
-os  = "darwin"
-abi = "aapcs64"
+arch = "aarch64"
+sys  = "darwin"
+env  = "macos"
+abi = "darwinpcs"
 
 [profile.debug]
-opt            = 0
+optimize       = false
 debug          = true
 simd           = "scalarize"
-vectorize      = false
-float_reassoc  = false
 default        = true
 
 [profile.release]
-opt            = 2
+optimize       = true
 debug          = false
 simd           = "scalarize"
-vectorize      = false
-float_reassoc  = false
 
 
 
@@ -51,8 +52,9 @@ float_reassoc  = false
 [artifact.sdl]
 kind    = "static"
 default = true
+export  = true
 entry   = "lib/libsdl.mach"
-out     = "lib/sdl"
+out     = "{project.work}/lib/sdl"
 targets = ["*"]
 link    = ["sdl", "sdl-win", "sdl-darwin", "sdl-ttf", "sdl-ttf-win", "sdl-ttf-darwin", "sdl-image", "sdl-image-win", "sdl-image-darwin", "sdl-mixer", "sdl-mixer-win", "sdl-mixer-darwin"]
 need    = []
@@ -60,109 +62,101 @@ need    = []
 [link.sdl]
 source  = "system"
 name    = "SDL3"
-library = "sdl"
-os     = ["linux"]
-isa    = "*"
-abi    = "*"
+sys    = ["linux"]
+arch   = ["*"]
+abi    = ["*"]
 export = true
 
 [link.sdl-win]
 source  = "system"
+include = "referenced"
 name    = "SDL3.dll"
-library = "sdl"
-os     = ["windows"]
-isa    = "*"
-abi    = "*"
+sys    = ["windows"]
+arch   = ["*"]
+abi    = ["*"]
 export = true
 
 [link.sdl-darwin]
 source  = "system"
 name    = "SDL3"
-library = "sdl"
-os      = ["darwin"]
-isa     = "*"
-abi     = "*"
+sys     = ["darwin"]
+arch    = ["*"]
+abi     = ["*"]
 export  = true
 
 [link.sdl-ttf]
 source  = "system"
 name    = "SDL3_ttf"
-library = "sdl-ttf"
-os      = ["linux"]
-isa     = "*"
-abi     = "*"
+sys     = ["linux"]
+arch    = ["*"]
+abi     = ["*"]
 export  = true
 
 [link.sdl-ttf-win]
 source  = "system"
+include = "referenced"
 name    = "SDL3_ttf.dll"
-library = "sdl-ttf"
-os      = ["windows"]
-isa     = "*"
-abi     = "*"
+sys     = ["windows"]
+arch    = ["*"]
+abi     = ["*"]
 export  = true
 
 [link.sdl-ttf-darwin]
 source  = "system"
 name    = "SDL3_ttf"
-library = "sdl-ttf"
-os      = ["darwin"]
-isa     = "*"
-abi     = "*"
+sys     = ["darwin"]
+arch    = ["*"]
+abi     = ["*"]
 export  = true
 
 [link.sdl-image]
 source  = "system"
 name    = "SDL3_image"
-library = "sdl-image"
-os      = ["linux"]
-isa     = "*"
-abi     = "*"
+sys     = ["linux"]
+arch    = ["*"]
+abi     = ["*"]
 export  = true
 
 [link.sdl-image-win]
 source  = "system"
+include = "referenced"
 name    = "SDL3_image.dll"
-library = "sdl-image"
-os      = ["windows"]
-isa     = "*"
-abi     = "*"
+sys     = ["windows"]
+arch    = ["*"]
+abi     = ["*"]
 export  = true
 
 [link.sdl-image-darwin]
 source  = "system"
 name    = "SDL3_image"
-library = "sdl-image"
-os      = ["darwin"]
-isa     = "*"
-abi     = "*"
+sys     = ["darwin"]
+arch    = ["*"]
+abi     = ["*"]
 export  = true
 
 [link.sdl-mixer]
 source  = "system"
 name    = "SDL3_mixer"
-library = "sdl-mixer"
-os      = ["linux"]
-isa     = "*"
-abi     = "*"
+sys     = ["linux"]
+arch    = ["*"]
+abi     = ["*"]
 export  = true
 
 [link.sdl-mixer-win]
 source  = "system"
+include = "referenced"
 name    = "SDL3_mixer.dll"
-library = "sdl-mixer"
-os      = ["windows"]
-isa     = "*"
-abi     = "*"
+sys     = ["windows"]
+arch    = ["*"]
+abi     = ["*"]
 export  = true
 
 [link.sdl-mixer-darwin]
 source  = "system"
 name    = "SDL3_mixer"
-library = "sdl-mixer"
-os      = ["darwin"]
-isa     = "*"
-abi     = "*"
+sys     = ["darwin"]
+arch    = ["*"]
+abi     = ["*"]
 export  = true
 
 [dep.std]

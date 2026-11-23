@@ -20,7 +20,7 @@ use std.types.string.str;
 
 # handle to an SDL texture. the zero value (nil handle) is invalid. the
 # same type as renderer.Texture
-fwd renderer.Texture;
+fwd sdl.renderer.Texture;
 
 # a texture size in pixels
 # ---
@@ -45,7 +45,7 @@ pub tag ScaleMode: u8 {
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -63,7 +63,7 @@ pub fun is_valid(tex: Texture) bool {
 # tex: texture the caller is about to use
 fun ready(tex: Texture) err[error.Error] {
     if (!is_valid(tex)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
@@ -79,13 +79,13 @@ fun ready(tex: Texture) err[error.Error] {
 #       error.Error.failed (text from error.message())
 pub fun create(rend: renderer.Renderer, w: i32, h: i32) res[Texture, error.Error] {
     if (!renderer.is_valid(rend)) {
-        ret res[Texture, error.Error].err{ error.Error.invalid{} };
+        ret res[Texture, error.Error].err{error.Error.invalid{}};
     }
     val handle: ptr = c.SDL_CreateTexture(rend.handle, c.PIXELFORMAT_RGBA8888, c.TEXTUREACCESS_TARGET, w, h);
     if (handle == nil) {
-        ret res[Texture, error.Error].err{ error.Error.failed{} };
+        ret res[Texture, error.Error].err{error.Error.failed{}};
     }
-    ret res[Texture, error.Error].ok{ Texture{ handle: handle } };
+    ret res[Texture, error.Error].ok{Texture{handle: handle}};
 }
 
 # upload a surface to a new texture. the surface stays alive and is still
@@ -97,16 +97,16 @@ pub fun create(rend: renderer.Renderer, w: i32, h: i32) res[Texture, error.Error
 #       or error.Error.failed (text from error.message())
 pub fun from_surface(rend: renderer.Renderer, surf: surface.Surface) res[Texture, error.Error] {
     if (!renderer.is_valid(rend)) {
-        ret res[Texture, error.Error].err{ error.Error.invalid{} };
+        ret res[Texture, error.Error].err{error.Error.invalid{}};
     }
     if (!surface.is_valid(surf)) {
-        ret res[Texture, error.Error].err{ error.Error.invalid{} };
+        ret res[Texture, error.Error].err{error.Error.invalid{}};
     }
     val handle: ptr = c.SDL_CreateTextureFromSurface(rend.handle, surf.handle);
     if (handle == nil) {
-        ret res[Texture, error.Error].err{ error.Error.failed{} };
+        ret res[Texture, error.Error].err{error.Error.failed{}};
     }
-    ret res[Texture, error.Error].ok{ Texture{ handle: handle } };
+    ret res[Texture, error.Error].ok{Texture{handle: handle}};
 }
 
 # load a BMP image file into a texture
@@ -120,11 +120,11 @@ pub fun from_surface(rend: renderer.Renderer, surf: surface.Surface) res[Texture
 #       error.Error.failed (text from error.message())
 pub fun load(rend: renderer.Renderer, path: str) res[Texture, error.Error] {
     if (!renderer.is_valid(rend)) {
-        ret res[Texture, error.Error].err{ error.Error.invalid{} };
+        ret res[Texture, error.Error].err{error.Error.invalid{}};
     }
     val loaded: res[surface.Surface, error.Error] = surface.load_bmp(path);
     if (sel loaded.err) {
-        ret res[Texture, error.Error].err{ loaded.err };
+        ret res[Texture, error.Error].err{loaded.err};
     }
     val result: res[Texture, error.Error] = from_surface(rend, loaded.ok);
     surface.destroy(loaded.ok);
@@ -146,13 +146,13 @@ pub fun destroy(tex: Texture) {
 # ret: the size, or an error.Error on failure
 pub fun size(tex: Texture) res[Size, error.Error] {
     val r: err[error.Error] = ready(tex);
-    if (sel r.err) { ret res[Size, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[Size, error.Error].err{r.err}; }
     var w: f32 = 0.0;
     var h: f32 = 0.0;
     if (c.SDL_GetTextureSize(tex.handle, ?w, ?h) == 0) {
-        ret res[Size, error.Error].err{ error.Error.failed{} };
+        ret res[Size, error.Error].err{error.Error.failed{}};
     }
-    ret res[Size, error.Error].ok{ Size{ w: w, h: h } };
+    ret res[Size, error.Error].ok{Size{w: w, h: h}};
 }
 
 # set how the texture combines with the target when drawn
@@ -171,10 +171,10 @@ pub fun set_blend(tex: Texture, mode: renderer.Blend) err[error.Error] {
 # ret: the blend mode, or error.Error.unsupported for a custom SDL blend mode
 pub fun blend(tex: Texture) res[renderer.Blend, error.Error] {
     val r: err[error.Error] = ready(tex);
-    if (sel r.err) { ret res[renderer.Blend, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[renderer.Blend, error.Error].err{r.err}; }
     var raw: u32 = 0;
     if (c.SDL_GetTextureBlendMode(tex.handle, ?raw) == 0) {
-        ret res[renderer.Blend, error.Error].err{ error.Error.failed{} };
+        ret res[renderer.Blend, error.Error].err{error.Error.failed{}};
     }
     ret renderer.blend_from_raw(raw);
 }
@@ -196,14 +196,14 @@ pub fun set_color_mod(tex: Texture, col: Color) err[error.Error] {
 # ret: the color with alpha 255, or an error.Error on failure
 pub fun color_mod(tex: Texture) res[Color, error.Error] {
     val r: err[error.Error] = ready(tex);
-    if (sel r.err) { ret res[Color, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[Color, error.Error].err{r.err}; }
     var cr: u8 = 0;
     var cg: u8 = 0;
     var cb: u8 = 0;
     if (c.SDL_GetTextureColorMod(tex.handle, ?cr, ?cg, ?cb) == 0) {
-        ret res[Color, error.Error].err{ error.Error.failed{} };
+        ret res[Color, error.Error].err{error.Error.failed{}};
     }
-    ret res[Color, error.Error].ok{ Color{ r: cr, g: cg, b: cb, a: 255 } };
+    ret res[Color, error.Error].ok{Color{r: cr, g: cg, b: cb, a: 255}};
 }
 
 # multiply the texture's alpha by a value when drawn
@@ -222,12 +222,12 @@ pub fun set_alpha_mod(tex: Texture, a: u8) err[error.Error] {
 # ret: the alpha modulation, or an error.Error on failure
 pub fun alpha_mod(tex: Texture) res[u8, error.Error] {
     val r: err[error.Error] = ready(tex);
-    if (sel r.err) { ret res[u8, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[u8, error.Error].err{r.err}; }
     var a: u8 = 0;
     if (c.SDL_GetTextureAlphaMod(tex.handle, ?a) == 0) {
-        ret res[u8, error.Error].err{ error.Error.failed{} };
+        ret res[u8, error.Error].err{error.Error.failed{}};
     }
-    ret res[u8, error.Error].ok{ a };
+    ret res[u8, error.Error].ok{a};
 }
 
 # set how the texture is sampled when drawn at a different size
@@ -248,13 +248,13 @@ pub fun set_scale_mode(tex: Texture, mode: ScaleMode) err[error.Error] {
 # ret: the scale mode, or an error.Error on failure
 pub fun scale_mode(tex: Texture) res[ScaleMode, error.Error] {
     val r: err[error.Error] = ready(tex);
-    if (sel r.err) { ret res[ScaleMode, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[ScaleMode, error.Error].err{r.err}; }
     var raw: u32 = 0;
     if (c.SDL_GetTextureScaleMode(tex.handle, ?raw) == 0) {
-        ret res[ScaleMode, error.Error].err{ error.Error.failed{} };
+        ret res[ScaleMode, error.Error].err{error.Error.failed{}};
     }
     if (raw == c.SCALEMODE_LINEAR) {
-        ret res[ScaleMode, error.Error].ok{ ScaleMode.linear{} };
+        ret res[ScaleMode, error.Error].ok{ScaleMode.linear{}};
     }
-    ret res[ScaleMode, error.Error].ok{ ScaleMode.nearest{} };
+    ret res[ScaleMode, error.Error].ok{ScaleMode.nearest{}};
 }

@@ -14,6 +14,15 @@
 # c.SDL_DestroySurface); textures belong to their renderer; free an
 # Animation with IMG_FreeAnimation, which also frees its frames.
 
+use std.types.string.str;
+
+$if ($mach.build.sys == $mach.sys.windows) {
+    val SDL_IMAGE: str = "sdl-image-win";
+}
+$or {
+    val SDL_IMAGE: str = "sdl-image";
+}
+
 # IMG_Animation, as returned by the IMG_LoadAnimation* functions
 # ---
 # w:      width of every frame in pixels
@@ -37,119 +46,119 @@ test sdl_img_animation_layout_is_32_bytes {
 # --- version ---
 
 # major * 1000000 + minor * 1000 + patch
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_Version() i32;
 
 # --- generic loaders: the format is detected from the data ---
 
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_Load(file: *u8) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_Load_IO(src: ptr, closeio: u8) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadTyped_IO(src: ptr, closeio: u8, type: *u8) ptr;
 
 # --- loaders straight to a texture (renderer owns the result) ---
 
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadTexture(renderer: ptr, file: *u8) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadTexture_IO(renderer: ptr, src: ptr, closeio: u8) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadTextureTyped_IO(renderer: ptr, src: ptr, closeio: u8, type: *u8) ptr;
 
 # --- format detection. each reads the stream and restores its position ---
 
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isAVIF(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isICO(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isCUR(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isBMP(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isGIF(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isJPG(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isJXL(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isLBM(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isPCX(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isPNG(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isPNM(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isSVG(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isQOI(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isTIF(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isXCF(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isXPM(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isXV(src: ptr) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_isWEBP(src: ptr) u8;
 
 # --- per-format loaders. no closeio flag: the caller closes the stream ---
 
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadAVIF_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadICO_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadCUR_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadBMP_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadGIF_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadJPG_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadJXL_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadLBM_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadPCX_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadPNG_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadPNM_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadSVG_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadQOI_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadTGA_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadTIF_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadXCF_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadXPM_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadXV_IO(src: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadWEBP_IO(src: ptr) ptr;
 
 # an SVG rasterized at a chosen size. a width or height of 0 keeps the SVG's
 # own aspect ratio from the other, 0 for both uses its natural size, and
 # giving both scales the SVG to fit inside that box, keeping its aspect
 # ratio (a side can come out smaller than asked)
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadSizedSVG_IO(src: ptr, width: i32, height: i32) ptr;
 
 # --- XPM from an in-memory array of C strings (`char **`) ---
 
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_ReadXPMFromArray(xpm: ptr) ptr;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_ReadXPMFromArrayToRGB888(xpm: ptr) ptr;
 
 # --- saving a surface. true on success, false on failure ---
@@ -158,32 +167,32 @@ pub ext fun IMG_ReadXPMFromArrayToRGB888(xpm: ptr) ptr;
 # middle, [67, 100] highest. PNG is lossless and takes none.
 # an existing file is overwritten.
 
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_SaveAVIF(surface: ptr, file: *u8, quality: i32) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_SaveAVIF_IO(surface: ptr, dst: ptr, closeio: u8, quality: i32) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_SavePNG(surface: ptr, file: *u8) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_SavePNG_IO(surface: ptr, dst: ptr, closeio: u8) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_SaveJPG(surface: ptr, file: *u8, quality: i32) u8;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_SaveJPG_IO(surface: ptr, dst: ptr, closeio: u8, quality: i32) u8;
 
 # --- animations (animated GIF and WebP; any other image loads as one frame) ---
 #
 # each loader returns NULL on failure. free the result with IMG_FreeAnimation.
 
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadAnimation(file: *u8) *Animation;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadAnimation_IO(src: ptr, closeio: u8) *Animation;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadAnimationTyped_IO(src: ptr, closeio: u8, type: *u8) *Animation;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadGIFAnimation_IO(src: ptr) *Animation;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_LoadWEBPAnimation_IO(src: ptr) *Animation;
-#[library("sdl-image")]
+#[library(SDL_IMAGE)]
 pub ext fun IMG_FreeAnimation(anim: *Animation);

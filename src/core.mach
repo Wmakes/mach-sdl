@@ -9,9 +9,9 @@ use sdl.error;
 use std.types.error.err;
 
 # init() flag: the video subsystem (windows, rendering, GL). implies EVENTS
-pub val VIDEO:  u32 = c.INIT_VIDEO;
+pub val VIDEO: u32 = c.INIT_VIDEO;
 # init() flag: the audio subsystem (sdl.audio, sdl.wav, device mixers)
-pub val AUDIO:  u32 = c.INIT_AUDIO;
+pub val AUDIO: u32 = c.INIT_AUDIO;
 # init() flag: the event queue only, without video
 pub val EVENTS: u32 = c.INIT_EVENTS;
 
@@ -23,7 +23,7 @@ pub val GAMEPAD: u32 = c.INIT_GAMEPAD;
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }

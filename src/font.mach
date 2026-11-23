@@ -82,7 +82,7 @@ pub tag Hinting: u8 {
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -95,14 +95,14 @@ fun to_err(succeeded: u8) err[error.Error] {
 # ---
 # col: the color to pack
 fun pack(col: Color) u32 {
-    val rv: u8 = col.r;
-    val gv: u8 = col.g;
-    val bv: u8 = col.b;
-    val av: u8 = col.a;
-    val r: u32 = rv::u32;
-    val g: u32 = gv::u32;
-    val b: u32 = bv::u32;
-    val a: u32 = av::u32;
+    val rv: u8  = col.r;
+    val gv: u8  = col.g;
+    val bv: u8  = col.b;
+    val av: u8  = col.a;
+    val r:  u32 = rv::u32;
+    val g:  u32 = gv::u32;
+    val b:  u32 = bv::u32;
+    val a:  u32 = av::u32;
     ret r | (g << 8) | (b << 16) | (a << 24);
 }
 
@@ -119,7 +119,7 @@ pub fun is_valid(fnt: Font) bool {
 # fnt: font the caller is about to use
 fun ready(fnt: Font) err[error.Error] {
     if (!is_valid(fnt)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
@@ -129,9 +129,9 @@ fun ready(fnt: Font) err[error.Error] {
 # handle: surface pointer, nil when SDL3_ttf failed
 fun surface_result(handle: ptr) res[surface.Surface, error.Error] {
     if (handle == nil) {
-        ret res[surface.Surface, error.Error].err{ error.Error.failed{} };
+        ret res[surface.Surface, error.Error].err{error.Error.failed{}};
     }
-    ret res[surface.Surface, error.Error].ok{ surface.Surface{ handle: handle } };
+    ret res[surface.Surface, error.Error].ok{surface.Surface{handle: handle}};
 }
 
 # the SDL3_ttf version this binding is linked against, as one integer
@@ -164,9 +164,9 @@ pub fun quit() {
 pub fun open(path: str, size: f32) res[Font, error.Error] {
     val handle: ptr = ttf.TTF_OpenFont(path, size);
     if (handle == nil) {
-        ret res[Font, error.Error].err{ error.Error.failed{} };
+        ret res[Font, error.Error].err{error.Error.failed{}};
     }
-    ret res[Font, error.Error].ok{ Font{ handle: handle } };
+    ret res[Font, error.Error].ok{Font{handle: handle}};
 }
 
 # close a font. safe on an invalid handle. surfaces and textures already
@@ -195,8 +195,8 @@ pub fun set_size(fnt: Font, size: f32) err[error.Error] {
 # ret: the size, or an error.Error on failure
 pub fun size(fnt: Font) res[f32, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[f32, error.Error].err{ r.err }; }
-    ret res[f32, error.Error].ok{ ttf.TTF_GetFontSize(fnt.handle) };
+    if (sel r.err) { ret res[f32, error.Error].err{r.err}; }
+    ret res[f32, error.Error].ok{ttf.TTF_GetFontSize(fnt.handle)};
 }
 
 # set the style flags used by every later render
@@ -217,8 +217,8 @@ pub fun set_style(fnt: Font, flags: u32) err[error.Error] {
 # ret: the flags, or an error.Error on failure
 pub fun style(fnt: Font) res[u32, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[u32, error.Error].err{ r.err }; }
-    ret res[u32, error.Error].ok{ ttf.TTF_GetFontStyle(fnt.handle) };
+    if (sel r.err) { ret res[u32, error.Error].err{r.err}; }
+    ret res[u32, error.Error].ok{ttf.TTF_GetFontStyle(fnt.handle)};
 }
 
 # set the outline thickness in pixels. 0 turns the outline off
@@ -237,8 +237,8 @@ pub fun set_outline(fnt: Font, pixels: i32) err[error.Error] {
 # ret: the thickness, or an error.Error on failure
 pub fun outline(fnt: Font) res[i32, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[i32, error.Error].err{ r.err }; }
-    ret res[i32, error.Error].ok{ ttf.TTF_GetFontOutline(fnt.handle) };
+    if (sel r.err) { ret res[i32, error.Error].err{r.err}; }
+    ret res[i32, error.Error].ok{ttf.TTF_GetFontOutline(fnt.handle)};
 }
 
 # set how outlines are fitted to the pixel grid
@@ -276,8 +276,8 @@ pub fun set_kerning(fnt: Font, enabled: bool) err[error.Error] {
 # ret: true for a monospace font, or an error.Error on failure
 pub fun is_fixed_width(fnt: Font) res[bool, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[bool, error.Error].err{ r.err }; }
-    ret res[bool, error.Error].ok{ ttf.TTF_FontIsFixedWidth(fnt.handle) != 0 };
+    if (sel r.err) { ret res[bool, error.Error].err{r.err}; }
+    ret res[bool, error.Error].ok{ttf.TTF_FontIsFixedWidth(fnt.handle) != 0};
 }
 
 # the font family name, such as "DejaVu Sans"
@@ -289,13 +289,13 @@ pub fun is_fixed_width(fnt: Font) res[bool, error.Error] {
 # ret: the name, or error.Error.failed if the font carries none
 pub fun family_name(fnt: Font) res[str, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[str, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[str, error.Error].err{r.err}; }
     val raw: *u8 = ttf.TTF_GetFontFamilyName(fnt.handle);
     if (raw == nil) {
-        ret res[str, error.Error].err{ error.Error.failed{} };
+        ret res[str, error.Error].err{error.Error.failed{}};
     }
     val s: str = raw;
-    ret res[str, error.Error].ok{ s };
+    ret res[str, error.Error].ok{s};
 }
 
 # the height of the font in pixels: the tallest line, the ascent plus the
@@ -305,8 +305,8 @@ pub fun family_name(fnt: Font) res[str, error.Error] {
 # ret: the height, or an error.Error on failure
 pub fun height(fnt: Font) res[i32, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[i32, error.Error].err{ r.err }; }
-    ret res[i32, error.Error].ok{ ttf.TTF_GetFontHeight(fnt.handle) };
+    if (sel r.err) { ret res[i32, error.Error].err{r.err}; }
+    ret res[i32, error.Error].ok{ttf.TTF_GetFontHeight(fnt.handle)};
 }
 
 # the distance in pixels from the baseline to the top of the tallest glyph
@@ -315,8 +315,8 @@ pub fun height(fnt: Font) res[i32, error.Error] {
 # ret: the ascent, or an error.Error on failure
 pub fun ascent(fnt: Font) res[i32, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[i32, error.Error].err{ r.err }; }
-    ret res[i32, error.Error].ok{ ttf.TTF_GetFontAscent(fnt.handle) };
+    if (sel r.err) { ret res[i32, error.Error].err{r.err}; }
+    ret res[i32, error.Error].ok{ttf.TTF_GetFontAscent(fnt.handle)};
 }
 
 # the distance in pixels from the baseline to the bottom of the lowest
@@ -326,8 +326,8 @@ pub fun ascent(fnt: Font) res[i32, error.Error] {
 # ret: the descent, or an error.Error on failure
 pub fun descent(fnt: Font) res[i32, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[i32, error.Error].err{ r.err }; }
-    ret res[i32, error.Error].ok{ ttf.TTF_GetFontDescent(fnt.handle) };
+    if (sel r.err) { ret res[i32, error.Error].err{r.err}; }
+    ret res[i32, error.Error].ok{ttf.TTF_GetFontDescent(fnt.handle)};
 }
 
 # the recommended distance in pixels between the baselines of two lines
@@ -336,8 +336,8 @@ pub fun descent(fnt: Font) res[i32, error.Error] {
 # ret: the line skip, or an error.Error on failure
 pub fun line_skip(fnt: Font) res[i32, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[i32, error.Error].err{ r.err }; }
-    ret res[i32, error.Error].ok{ ttf.TTF_GetFontLineSkip(fnt.handle) };
+    if (sel r.err) { ret res[i32, error.Error].err{r.err}; }
+    ret res[i32, error.Error].ok{ttf.TTF_GetFontLineSkip(fnt.handle)};
 }
 
 # measure a single line of text without rendering it
@@ -347,13 +347,13 @@ pub fun line_skip(fnt: Font) res[i32, error.Error] {
 # ret:  the size in pixels, or an error.Error on failure
 pub fun measure(fnt: Font, text: str) res[TextSize, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[TextSize, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[TextSize, error.Error].err{r.err}; }
     var w: i32 = 0;
     var h: i32 = 0;
     if (ttf.TTF_GetStringSize(fnt.handle, text, 0, ?w, ?h) == 0) {
-        ret res[TextSize, error.Error].err{ error.Error.failed{} };
+        ret res[TextSize, error.Error].err{error.Error.failed{}};
     }
-    ret res[TextSize, error.Error].ok{ TextSize{ w: w, h: h } };
+    ret res[TextSize, error.Error].ok{TextSize{w: w, h: h}};
 }
 
 # measure text that wraps at a width, without rendering it
@@ -364,13 +364,13 @@ pub fun measure(fnt: Font, text: str) res[TextSize, error.Error] {
 # ret:        the size in pixels, or an error.Error on failure
 pub fun measure_wrapped(fnt: Font, text: str, wrap_width: i32) res[TextSize, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[TextSize, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[TextSize, error.Error].err{r.err}; }
     var w: i32 = 0;
     var h: i32 = 0;
     if (ttf.TTF_GetStringSizeWrapped(fnt.handle, text, 0, wrap_width, ?w, ?h) == 0) {
-        ret res[TextSize, error.Error].err{ error.Error.failed{} };
+        ret res[TextSize, error.Error].err{error.Error.failed{}};
     }
-    ret res[TextSize, error.Error].ok{ TextSize{ w: w, h: h } };
+    ret res[TextSize, error.Error].ok{TextSize{w: w, h: h}};
 }
 
 # render a line of text to a surface, fast and without antialiasing
@@ -383,7 +383,7 @@ pub fun measure_wrapped(fnt: Font, text: str, wrap_width: i32) res[TextSize, err
 # ret:  the new Surface, or an error.Error on failure
 pub fun render_solid(fnt: Font, text: str, fg: Color) res[surface.Surface, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[surface.Surface, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[surface.Surface, error.Error].err{r.err}; }
     ret surface_result(ttf.TTF_RenderText_Solid(fnt.handle, text, 0, pack(fg)));
 }
 
@@ -399,7 +399,7 @@ pub fun render_solid(fnt: Font, text: str, fg: Color) res[surface.Surface, error
 # ret:  the new Surface, or an error.Error on failure
 pub fun render_shaded(fnt: Font, text: str, fg: Color, bg: Color) res[surface.Surface, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[surface.Surface, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[surface.Surface, error.Error].err{r.err}; }
     ret surface_result(ttf.TTF_RenderText_Shaded(fnt.handle, text, 0, pack(fg), pack(bg)));
 }
 
@@ -414,7 +414,7 @@ pub fun render_shaded(fnt: Font, text: str, fg: Color, bg: Color) res[surface.Su
 # ret:  the new Surface, or an error.Error on failure
 pub fun render_blended(fnt: Font, text: str, fg: Color) res[surface.Surface, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[surface.Surface, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[surface.Surface, error.Error].err{r.err}; }
     ret surface_result(ttf.TTF_RenderText_Blended(fnt.handle, text, 0, pack(fg)));
 }
 
@@ -427,7 +427,7 @@ pub fun render_blended(fnt: Font, text: str, fg: Color) res[surface.Surface, err
 # ret:        the new Surface, or an error.Error on failure
 pub fun render_blended_wrapped(fnt: Font, text: str, fg: Color, wrap_width: i32) res[surface.Surface, error.Error] {
     val r: err[error.Error] = ready(fnt);
-    if (sel r.err) { ret res[surface.Surface, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[surface.Surface, error.Error].err{r.err}; }
     ret surface_result(ttf.TTF_RenderText_Blended_Wrapped(fnt.handle, text, 0, pack(fg), wrap_width));
 }
 
@@ -445,7 +445,7 @@ pub fun render_blended_wrapped(fnt: Font, text: str, fg: Color, wrap_width: i32)
 #       or error.Error.failed (text from error.message())
 pub fun render_texture(rend: renderer.Renderer, fnt: Font, text: str, fg: Color) res[texture.Texture, error.Error] {
     val rendered: res[surface.Surface, error.Error] = render_blended(fnt, text, fg);
-    if (sel rendered.err) { ret res[texture.Texture, error.Error].err{ rendered.err }; }
+    if (sel rendered.err) { ret res[texture.Texture, error.Error].err{rendered.err}; }
     val result: res[texture.Texture, error.Error] = texture.from_surface(rend, rendered.ok);
     surface.destroy(rendered.ok);
     ret result;
@@ -465,20 +465,20 @@ pub fun render_texture(rend: renderer.Renderer, fnt: Font, text: str, fg: Color)
 #             font, or error.Error.failed (text from error.message())
 pub fun render_texture_wrapped(rend: renderer.Renderer, fnt: Font, text: str, fg: Color, wrap_width: i32) res[texture.Texture, error.Error] {
     val rendered: res[surface.Surface, error.Error] = render_blended_wrapped(fnt, text, fg, wrap_width);
-    if (sel rendered.err) { ret res[texture.Texture, error.Error].err{ rendered.err }; }
+    if (sel rendered.err) { ret res[texture.Texture, error.Error].err{rendered.err}; }
     val result: res[texture.Texture, error.Error] = texture.from_surface(rend, rendered.ok);
     surface.destroy(rendered.ok);
     ret result;
 }
 
 test font__pack_color_byte_order {
-    val col: Color = Color{ r: 1, g: 2, b: 3, a: 4 };
+    val col: Color = Color{r: 1, g: 2, b: 3, a: 4};
     if (pack(col) != 0x04030201) { ret 1; }
     ret 0;
 }
 
 test font__invalid_handle_rejected {
-    val nil_font: Font = Font{ handle: nil };
+    val nil_font: Font = Font{handle: nil};
     if (is_valid(nil_font)) { ret 1; }
     val m: res[TextSize, error.Error] = measure(nil_font, "x");
     if (!sel m.err) { ret 2; }

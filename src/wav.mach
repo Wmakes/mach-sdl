@@ -56,18 +56,18 @@ pub fun is_valid(clip: Clip) bool {
 #       sample format audio.Format does not cover, or error.Error.failed
 #       (text from error.message())
 pub fun load(path: str) res[Clip, error.Error] {
-    var spec: c.AudioSpec = c.AudioSpec{ format: 0, channels: 0, freq: 0 };
-    var buf: ptr = nil;
-    var len: u32 = 0;
+    var spec: c.AudioSpec = c.AudioSpec{format: 0, channels: 0, freq: 0};
+    var buf:  ptr         = nil;
+    var len:  u32         = 0;
     if (c.SDL_LoadWAV(path, ?spec, ?buf, ?len) == 0) {
-        ret res[Clip, error.Error].err{ error.Error.failed{} };
+        ret res[Clip, error.Error].err{error.Error.failed{}};
     }
     val fmt: opt[audio.Format] = audio.format_from_raw(spec.format);
     if (!sel fmt.some) {
         c.SDL_free(buf);
-        ret res[Clip, error.Error].err{ error.Error.unsupported{} };
+        ret res[Clip, error.Error].err{error.Error.unsupported{}};
     }
-    ret res[Clip, error.Error].ok{ Clip{ data: buf, len: len, format: fmt.some, channels: spec.channels, freq: spec.freq } };
+    ret res[Clip, error.Error].ok{Clip{data: buf, len: len, format: fmt.some, channels: spec.channels, freq: spec.freq}};
 }
 
 # release a clip's sample data. safe on an invalid clip
@@ -87,16 +87,16 @@ pub fun destroy(clip: Clip) {
 #       error.Error.failed (text from error.message())
 pub fun open(clip: Clip) res[audio.Stream, error.Error] {
     if (!is_valid(clip)) {
-        ret res[audio.Stream, error.Error].err{ error.Error.invalid{} };
+        ret res[audio.Stream, error.Error].err{error.Error.invalid{}};
     }
     val opened: res[audio.Stream, error.Error] = audio.open(clip.format, clip.channels, clip.freq);
     if (sel opened.err) {
-        ret res[audio.Stream, error.Error].err{ opened.err };
+        ret res[audio.Stream, error.Error].err{opened.err};
     }
     val queued: err[error.Error] = audio.put(opened.ok, clip.data::*u8, clip.len::usize);
     if (sel queued.err) {
         audio.close(opened.ok);
-        ret res[audio.Stream, error.Error].err{ queued.err };
+        ret res[audio.Stream, error.Error].err{queued.err};
     }
     ret opened;
 }

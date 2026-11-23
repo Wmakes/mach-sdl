@@ -48,7 +48,7 @@ pub fun delay(ms: u32) {
 # ---
 # ret: a Clock ready for its first tick
 pub fun clock() Clock {
-    ret Clock{ last: c.SDL_GetPerformanceCounter() };
+    ret Clock{last: c.SDL_GetPerformanceCounter()};
 }
 
 # seconds elapsed since this clock's previous tick (or since clock(), on the
@@ -71,7 +71,7 @@ test timer_a_fresh_clock_s_first_tick_is_not_negative_or_absurd {
     delay(5);
     val dt: f64 = tick(?clk);
     if (dt < 0.0) { ret 1; }
-    if (dt > 5.0) { ret 1; }  # sanity ceiling, not a real timing assertion
+    if (dt > 5.0) { ret 1; } # sanity ceiling, not a real timing assertion
     ret 0;
 }
 

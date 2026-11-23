@@ -31,7 +31,7 @@ pub rec Size {
 }
 
 # create() flag: the window can hold an OpenGL context (see sdl.gl)
-pub val OPENGL:    u64 = c.WINDOW_OPENGL;
+pub val OPENGL: u64 = c.WINDOW_OPENGL;
 # create() flag: the user can resize the window
 pub val RESIZABLE: u64 = c.WINDOW_RESIZABLE;
 
@@ -48,7 +48,7 @@ pub fun is_valid(win: Window) bool {
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -58,7 +58,7 @@ fun to_err(succeeded: u8) err[error.Error] {
 # win: window the caller is about to use
 fun ready(win: Window) err[error.Error] {
     if (!is_valid(win)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
@@ -73,9 +73,9 @@ fun ready(win: Window) err[error.Error] {
 pub fun create(title: str, w: i32, h: i32, flags: u64) res[Window, error.Error] {
     val handle: ptr = c.SDL_CreateWindow(title, w, h, flags);
     if (handle == nil) {
-        ret res[Window, error.Error].err{ error.Error.failed{} };
+        ret res[Window, error.Error].err{error.Error.failed{}};
     }
-    ret res[Window, error.Error].ok{ Window{ handle: handle } };
+    ret res[Window, error.Error].ok{Window{handle: handle}};
 }
 
 # destroy a window and its resources. safe on an invalid handle
@@ -103,20 +103,20 @@ pub fun set_title(win: Window, title: str) err[error.Error] {
 # ret: the size, or an error.Error on failure
 pub fun size(win: Window) res[Size, error.Error] {
     val r: err[error.Error] = ready(win);
-    if (sel r.err) { ret res[Size, error.Error].err{ r.err }; }
+    if (sel r.err) { ret res[Size, error.Error].err{r.err}; }
     var w: i32 = 0;
     var h: i32 = 0;
     if (c.SDL_GetWindowSize(win.handle, ?w, ?h) == 0) {
-        ret res[Size, error.Error].err{ error.Error.failed{} };
+        ret res[Size, error.Error].err{error.Error.failed{}};
     }
-    ret res[Size, error.Error].ok{ Size{ w: w, h: h } };
+    ret res[Size, error.Error].ok{Size{w: w, h: h}};
 }
 
 # resize the window
 # ---
 # win: window to change
-# w: width in screen coordinates
-# h: height in screen coordinates
+# w:   width in screen coordinates
+# h:   height in screen coordinates
 pub fun set_size(win: Window, w: i32, h: i32) err[error.Error] {
     val r: err[error.Error] = ready(win);
     if (!sel r.ok) { ret r; }
@@ -126,8 +126,8 @@ pub fun set_size(win: Window, w: i32, h: i32) err[error.Error] {
 # move the window on the desktop
 # ---
 # win: window to move
-# x: x position in screen coordinates
-# y: y position in screen coordinates
+# x:   x position in screen coordinates
+# y:   y position in screen coordinates
 pub fun set_position(win: Window, x: i32, y: i32) err[error.Error] {
     val r: err[error.Error] = ready(win);
     if (!sel r.ok) { ret r; }
@@ -137,18 +137,18 @@ pub fun set_position(win: Window, x: i32, y: i32) err[error.Error] {
 # switch the window to or from fullscreen
 # ---
 # win: window to change
-# on: true for fullscreen
+# on:  true for fullscreen
 pub fun set_fullscreen(win: Window, on: bool) err[error.Error] {
     val r: err[error.Error] = ready(win);
     if (!sel r.ok) { ret r; }
-    ret to_err(c.SDL_SetWindowFullscreen(win.handle, on));
+    ret to_err(c.SDL_SetWindowFullscreen(win.handle, on::u8));
 }
 
 # set the smallest size the user can resize to
 # ---
 # win: window to change
-# w: minimum width in screen coordinates
-# h: minimum height in screen coordinates
+# w:   minimum width in screen coordinates
+# h:   minimum height in screen coordinates
 pub fun set_min_size(win: Window, w: i32, h: i32) err[error.Error] {
     val r: err[error.Error] = ready(win);
     if (!sel r.ok) { ret r; }
@@ -158,8 +158,8 @@ pub fun set_min_size(win: Window, w: i32, h: i32) err[error.Error] {
 # set the largest size the user can resize to. 0 means no limit
 # ---
 # win: window to change
-# w: maximum width in screen coordinates
-# h: maximum height in screen coordinates
+# w:   maximum width in screen coordinates
+# h:   maximum height in screen coordinates
 pub fun set_max_size(win: Window, w: i32, h: i32) err[error.Error] {
     val r: err[error.Error] = ready(win);
     if (!sel r.ok) { ret r; }

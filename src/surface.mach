@@ -36,9 +36,9 @@ pub fun is_valid(surf: Surface) bool {
 pub fun load_bmp(path: str) res[Surface, error.Error] {
     val handle: ptr = c.SDL_LoadBMP(path);
     if (handle == nil) {
-        ret res[Surface, error.Error].err{ error.Error.failed{} };
+        ret res[Surface, error.Error].err{error.Error.failed{}};
     }
-    ret res[Surface, error.Error].ok{ Surface{ handle: handle } };
+    ret res[Surface, error.Error].ok{Surface{handle: handle}};
 }
 
 # destroy a surface. safe on an invalid handle

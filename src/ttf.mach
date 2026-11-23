@@ -7,23 +7,31 @@
 # a text `length` of 0 means the string is NUL-terminated.
 
 use std.types.size.usize;
+use std.types.string.str;
+
+$if ($mach.build.sys == $mach.sys.windows) {
+    val SDL_TTF: str = "sdl-ttf-win";
+}
+$or {
+    val SDL_TTF: str = "sdl-ttf";
+}
 
 # --- init / version ---
 
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_Version() i32;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_Init() u8;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_Quit();
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_WasInit() i32;
 
 # --- font lifetime ---
 
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_OpenFont(file: *u8, ptsize: f32) ptr;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_CloseFont(font: ptr);
 
 # --- style flags (TTF_FontStyleFlags, a Uint32 bit set) ---
@@ -44,51 +52,51 @@ pub val HINTING_LIGHT_SUBPIXEL: i32 = 4;
 
 # --- font properties ---
 
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_SetFontSize(font: ptr, ptsize: f32) u8;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontSize(font: ptr) f32;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_SetFontStyle(font: ptr, style: u32);
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontStyle(font: ptr) u32;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_SetFontOutline(font: ptr, outline: i32) u8;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontOutline(font: ptr) i32;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_SetFontHinting(font: ptr, hinting: i32);
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontHinting(font: ptr) i32;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_SetFontKerning(font: ptr, enabled: u8);
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontKerning(font: ptr) u8;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_FontIsFixedWidth(font: ptr) u8;
 
 # the family and style names are font-owned and borrowed; NULL if absent
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontFamilyName(font: ptr) *u8;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontStyleName(font: ptr) *u8;
 
 # --- font metrics, in pixels ---
 
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontHeight(font: ptr) i32;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontAscent(font: ptr) i32;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontDescent(font: ptr) i32;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetFontLineSkip(font: ptr) i32;
 
 # --- measuring text ---
 
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetStringSize(font: ptr, text: *u8, length: usize, w: *i32, h: *i32) u8;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_GetStringSizeWrapped(font: ptr, text: *u8, length: usize, wrap_width: i32, w: *i32, h: *i32) u8;
 
 # --- rendering text to an SDL_Surface (caller owns it: SDL_DestroySurface) ---
@@ -101,11 +109,11 @@ pub ext fun TTF_GetStringSizeWrapped(font: ptr, text: *u8, length: usize, wrap_w
 # idiomatic layer reports it as error.Error.failed like any other failure.
 # SDL_Color arguments are u32, see the header comment.
 
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_RenderText_Solid(font: ptr, text: *u8, length: usize, fg: u32) ptr;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_RenderText_Shaded(font: ptr, text: *u8, length: usize, fg: u32, bg: u32) ptr;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_RenderText_Blended(font: ptr, text: *u8, length: usize, fg: u32) ptr;
-#[library("sdl-ttf")]
+#[library(SDL_TTF)]
 pub ext fun TTF_RenderText_Blended_Wrapped(font: ptr, text: *u8, length: usize, fg: u32, wrap_width: i32) ptr;

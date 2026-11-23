@@ -16,15 +16,15 @@ use std.types.bool.false;
 use std.types.error.err;
 
 # the left button
-pub val LEFT:   u8 = c.BUTTON_LEFT;
+pub val LEFT: u8 = c.BUTTON_LEFT;
 # the middle button (wheel click)
 pub val MIDDLE: u8 = c.BUTTON_MIDDLE;
 # the right button
-pub val RIGHT:  u8 = c.BUTTON_RIGHT;
+pub val RIGHT: u8 = c.BUTTON_RIGHT;
 # the first extra button (usually "back")
-pub val X1:     u8 = c.BUTTON_X1;
+pub val X1: u8 = c.BUTTON_X1;
 # the second extra button (usually "forward")
-pub val X2:     u8 = c.BUTTON_X2;
+pub val X2: u8 = c.BUTTON_X2;
 
 # mouse position and held buttons
 # ---
@@ -54,7 +54,7 @@ pub fun held(buttons: u32, button: u8) bool {
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -64,7 +64,7 @@ fun to_err(succeeded: u8) err[error.Error] {
 # win: window the caller is about to use
 fun ready(win: window.Window) err[error.Error] {
     if (!window.is_valid(win)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
@@ -73,10 +73,10 @@ fun ready(win: window.Window) err[error.Error] {
 # ---
 # ret: position in window coordinates and the button bitmask
 pub fun state() State {
-    var x: f32 = 0.0;
-    var y: f32 = 0.0;
+    var x:       f32 = 0.0;
+    var y:       f32 = 0.0;
     val buttons: u32 = c.SDL_GetMouseState(?x, ?y);
-    ret State{ x: x, y: y, buttons: buttons };
+    ret State{x: x, y: y, buttons: buttons};
 }
 
 # the mouse motion accumulated since the last call, and held buttons. the
@@ -85,10 +85,10 @@ pub fun state() State {
 # ---
 # ret: x, y hold the motion deltas, plus the button bitmask
 pub fun relative_state() State {
-    var dx: f32 = 0.0;
-    var dy: f32 = 0.0;
+    var dx:      f32 = 0.0;
+    var dy:      f32 = 0.0;
     val buttons: u32 = c.SDL_GetRelativeMouseState(?dx, ?dy);
-    ret State{ x: dx, y: dy, buttons: buttons };
+    ret State{x: dx, y: dy, buttons: buttons};
 }
 
 # move the cursor to a position inside a window. does nothing for an
@@ -120,7 +120,7 @@ pub fun hide_cursor() err[error.Error] {
 pub fun set_relative(win: window.Window, on: bool) err[error.Error] {
     val r: err[error.Error] = ready(win);
     if (!sel r.ok) { ret r; }
-    ret to_err(c.SDL_SetWindowRelativeMouseMode(win.handle, on));
+    ret to_err(c.SDL_SetWindowRelativeMouseMode(win.handle, on::u8));
 }
 
 # whether relative mode is on for a window
@@ -139,5 +139,5 @@ pub fun is_relative(win: window.Window) bool {
 # ---
 # on: true to start capturing, false to release
 pub fun capture(on: bool) err[error.Error] {
-    ret to_err(c.SDL_CaptureMouse(on));
+    ret to_err(c.SDL_CaptureMouse(on::u8));
 }

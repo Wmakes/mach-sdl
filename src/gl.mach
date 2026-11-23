@@ -40,17 +40,17 @@ pub fun is_valid(ctx: GlContext) bool {
 #      error.Error.failed (text from error.message())
 pub fun create_context(win: window.Window) res[GlContext, error.Error] {
     if (!window.is_valid(win)) {
-        ret res[GlContext, error.Error].err{ error.Error.invalid{} };
+        ret res[GlContext, error.Error].err{error.Error.invalid{}};
     }
     val handle: ptr = c.SDL_GL_CreateContext(win.handle);
     if (handle == nil) {
-        ret res[GlContext, error.Error].err{ error.Error.failed{} };
+        ret res[GlContext, error.Error].err{error.Error.failed{}};
     }
     if (c.SDL_GL_MakeCurrent(win.handle, handle) == 0) {
         c.SDL_GL_DestroyContext(handle);
-        ret res[GlContext, error.Error].err{ error.Error.failed{} };
+        ret res[GlContext, error.Error].err{error.Error.failed{}};
     }
-    ret res[GlContext, error.Error].ok{ GlContext{ handle: handle } };
+    ret res[GlContext, error.Error].ok{GlContext{handle: handle}};
 }
 
 # destroy a GL context. safe on an invalid handle
@@ -67,10 +67,10 @@ pub fun destroy_context(ctx: GlContext) {
 # win: window to swap
 pub fun swap(win: window.Window) err[error.Error] {
     if (!window.is_valid(win)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     if (c.SDL_GL_SwapWindow(win.handle) == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -85,5 +85,5 @@ pub fun proc_address(name: str) opt[ptr] {
     if (addr == nil) {
         ret opt[ptr].none{};
     }
-    ret opt[ptr].some{ addr };
+    ret opt[ptr].some{addr};
 }

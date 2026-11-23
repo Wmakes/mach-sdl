@@ -68,11 +68,11 @@ fun format_to_raw(format: Format) u32 {
 # ret: the Format, or none for a format this binding does not cover
 #      (big-endian variants and the like)
 pub fun format_from_raw(raw: u32) opt[Format] {
-    if (raw == c.AUDIO_FORMAT_U8)  { ret opt[Format].some{ Format.u8{} }; }
-    if (raw == c.AUDIO_FORMAT_S8)  { ret opt[Format].some{ Format.s8{} }; }
-    if (raw == c.AUDIO_FORMAT_S16) { ret opt[Format].some{ Format.s16{} }; }
-    if (raw == c.AUDIO_FORMAT_S32) { ret opt[Format].some{ Format.s32{} }; }
-    if (raw == c.AUDIO_FORMAT_F32) { ret opt[Format].some{ Format.f32{} }; }
+    if (raw == c.AUDIO_FORMAT_U8)  { ret opt[Format].some{Format.u8{}}; }
+    if (raw == c.AUDIO_FORMAT_S8)  { ret opt[Format].some{Format.s8{}}; }
+    if (raw == c.AUDIO_FORMAT_S16) { ret opt[Format].some{Format.s16{}}; }
+    if (raw == c.AUDIO_FORMAT_S32) { ret opt[Format].some{Format.s32{}}; }
+    if (raw == c.AUDIO_FORMAT_F32) { ret opt[Format].some{Format.f32{}}; }
     ret opt[Format].none{};
 }
 
@@ -81,7 +81,7 @@ pub fun format_from_raw(raw: u32) opt[Format] {
 # succeeded: the u8 result of an SDL call, nonzero on success
 fun to_err(succeeded: u8) err[error.Error] {
     if (succeeded == 0) {
-        ret err[error.Error].err{ error.Error.failed{} };
+        ret err[error.Error].err{error.Error.failed{}};
     }
     ret err[error.Error].ok{};
 }
@@ -99,7 +99,7 @@ pub fun is_valid(stream: Stream) bool {
 # stream: stream the caller is about to use
 fun ready(stream: Stream) err[error.Error] {
     if (!is_valid(stream)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret err[error.Error].ok{};
 }
@@ -111,12 +111,12 @@ fun ready(stream: Stream) err[error.Error] {
 # channels: channel count
 # freq:     sample rate in Hz
 fun open_id(devid: u32, format: Format, channels: i32, freq: i32) res[Stream, error.Error] {
-    val spec: c.AudioSpec = c.AudioSpec{ format: format_to_raw(format), channels: channels, freq: freq };
-    val handle: ptr = c.SDL_OpenAudioDeviceStream(devid, ?spec, nil, nil);
+    val spec:   c.AudioSpec = c.AudioSpec{format: format_to_raw(format), channels: channels, freq: freq};
+    val handle: ptr         = c.SDL_OpenAudioDeviceStream(devid, ?spec, nil, nil);
     if (handle == nil) {
-        ret res[Stream, error.Error].err{ error.Error.failed{} };
+        ret res[Stream, error.Error].err{error.Error.failed{}};
     }
-    ret res[Stream, error.Error].ok{ Stream{ handle: handle } };
+    ret res[Stream, error.Error].ok{Stream{handle: handle}};
 }
 
 # open a stream bound to the default playback device. it starts paused
@@ -145,7 +145,7 @@ pub fun open_on(dev: Device, format: Format, channels: i32, freq: i32) res[Strea
 # ret: the count, 0 if there are none or SDL reports failure
 pub fun playback_device_count() i32 {
     var count: i32 = 0;
-    val ids: ptr = c.SDL_GetAudioPlaybackDevices(?count);
+    val ids:   ptr = c.SDL_GetAudioPlaybackDevices(?count);
     if (ids == nil) {
         ret 0;
     }
@@ -163,7 +163,7 @@ pub fun playback_device_count() i32 {
 # ret:   the Device, or none for an index out of range or if SDL fails
 pub fun playback_device(index: i32) opt[Device] {
     var count: i32 = 0;
-    val ids: ptr = c.SDL_GetAudioPlaybackDevices(?count);
+    val ids:   ptr = c.SDL_GetAudioPlaybackDevices(?count);
     if (ids == nil) {
         ret opt[Device].none{};
     }
@@ -178,7 +178,7 @@ pub fun playback_device(index: i32) opt[Device] {
         ret opt[Device].none{};
     }
     val name: str = raw;
-    ret opt[Device].some{ Device{ id: id, name: name } };
+    ret opt[Device].some{Device{id: id, name: name}};
 }
 
 # close a stream and its device. safe on an invalid handle
@@ -203,7 +203,7 @@ pub fun put(stream: Stream, data: *u8, len: usize) err[error.Error] {
     val r: err[error.Error] = ready(stream);
     if (!sel r.ok) { ret r; }
     if (len > (2147483647::usize)) {
-        ret err[error.Error].err{ error.Error.invalid{} };
+        ret err[error.Error].err{error.Error.invalid{}};
     }
     ret to_err(c.SDL_PutAudioStreamData(stream.handle, data::ptr, len::i32));
 }

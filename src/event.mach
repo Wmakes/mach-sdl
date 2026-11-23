@@ -49,7 +49,7 @@ pub rec KeyEvent {
 
 # mouse movement
 # ---
-# window:  id of the window with mouse focus
+# window: id of the window with mouse focus
 # x, y:    position in window coordinates
 # dx, dy:  movement since the last motion event
 # buttons: bitmask of held buttons, test with mouse.held(buttons, mouse.LEFT)
@@ -156,22 +156,22 @@ pub rec GamepadAxis {
 pub tag Event: u8 {
     unknown: u32;
     quit;
-    window_close: WindowEvent;
-    window_resized: WindowEvent;
+    window_close:        WindowEvent;
+    window_resized:      WindowEvent;
     window_focus_gained: WindowEvent;
-    window_focus_lost: WindowEvent;
-    key_down: KeyEvent;
-    key_up: KeyEvent;
-    mouse_motion: MouseMotion;
-    mouse_button_down: MouseButton;
-    mouse_button_up: MouseButton;
-    mouse_wheel: MouseWheel;
-    text_input: TextInput;
-    gamepad_added: GamepadDevice;
-    gamepad_removed: GamepadDevice;
+    window_focus_lost:   WindowEvent;
+    key_down:            KeyEvent;
+    key_up:              KeyEvent;
+    mouse_motion:        MouseMotion;
+    mouse_button_down:   MouseButton;
+    mouse_button_up:     MouseButton;
+    mouse_wheel:         MouseWheel;
+    text_input:          TextInput;
+    gamepad_added:       GamepadDevice;
+    gamepad_removed:     GamepadDevice;
     gamepad_button_down: GamepadButton;
-    gamepad_button_up: GamepadButton;
-    gamepad_axis: GamepadAxis;
+    gamepad_button_up:   GamepadButton;
+    gamepad_axis:        GamepadAxis;
 }
 
 # copy the window fields out of a raw window event
@@ -191,7 +191,7 @@ fun key_event(raw: *c.Event) KeyEvent {
         window:   (@k).window_id,
         scancode: (@k).scancode,
         mods:     (@k).mod_,
-        repeat:   (@k).repeat,
+        repeat:   (@k).repeat::bool,
     };
 }
 
@@ -236,8 +236,8 @@ fun wheel_event(raw: *c.Event) MouseWheel {
 # copy the text out of a raw text input event. the text is SDL's buffer,
 # borrowed until the next poll()
 fun text_event(raw: *c.Event) TextInput {
-    val t: *c.TextInputEvent = raw::*c.TextInputEvent;
-    val text: *u8 = (@t).text;
+    val t:    *c.TextInputEvent = raw::*c.TextInputEvent;
+    val text: *u8               = (@t).text;
     ret TextInput{
         window: (@t).window_id,
         text:   text::str,
@@ -247,42 +247,42 @@ fun text_event(raw: *c.Event) TextInput {
 # copy the id out of a raw gamepad device event
 fun gamepad_device_event(raw: *c.Event) GamepadDevice {
     val d: *c.GamepadDeviceEvent = raw::*c.GamepadDeviceEvent;
-    ret GamepadDevice{ id: (@d).which };
+    ret GamepadDevice{id: (@d).which};
 }
 
 # copy the fields out of a raw gamepad button event
 fun gamepad_button_event(raw: *c.Event) GamepadButton {
     val b: *c.GamepadButtonEvent = raw::*c.GamepadButtonEvent;
-    ret GamepadButton{ id: (@b).which, button: (@b).button };
+    ret GamepadButton{id: (@b).which, button: (@b).button};
 }
 
 # copy the fields out of a raw gamepad axis event
 fun gamepad_axis_event(raw: *c.Event) GamepadAxis {
     val a: *c.GamepadAxisEvent = raw::*c.GamepadAxisEvent;
-    ret GamepadAxis{ id: (@a).which, axis: (@a).axis, value: (@a).value };
+    ret GamepadAxis{id: (@a).which, axis: (@a).axis, value: (@a).value};
 }
 
 # decode one raw SDL event into the Event tag
 fun decode(raw: *c.Event) Event {
     val t: u32 = (@raw).event_type;
-    if (t == c.EVENT_QUIT) { ret Event.quit{}; }
-    if (t == c.EVENT_WINDOW_CLOSE_REQUESTED) { ret Event.window_close{ window_event(raw) }; }
-    if (t == c.EVENT_WINDOW_RESIZED) { ret Event.window_resized{ window_event(raw) }; }
-    if (t == c.EVENT_WINDOW_FOCUS_GAINED) { ret Event.window_focus_gained{ window_event(raw) }; }
-    if (t == c.EVENT_WINDOW_FOCUS_LOST) { ret Event.window_focus_lost{ window_event(raw) }; }
-    if (t == c.EVENT_KEY_DOWN) { ret Event.key_down{ key_event(raw) }; }
-    if (t == c.EVENT_KEY_UP) { ret Event.key_up{ key_event(raw) }; }
-    if (t == c.EVENT_MOUSE_MOTION) { ret Event.mouse_motion{ motion_event(raw) }; }
-    if (t == c.EVENT_MOUSE_BUTTON_DOWN) { ret Event.mouse_button_down{ button_event(raw) }; }
-    if (t == c.EVENT_MOUSE_BUTTON_UP) { ret Event.mouse_button_up{ button_event(raw) }; }
-    if (t == c.EVENT_MOUSE_WHEEL) { ret Event.mouse_wheel{ wheel_event(raw) }; }
-    if (t == c.EVENT_TEXT_INPUT) { ret Event.text_input{ text_event(raw) }; }
-    if (t == c.EVENT_GAMEPAD_ADDED) { ret Event.gamepad_added{ gamepad_device_event(raw) }; }
-    if (t == c.EVENT_GAMEPAD_REMOVED) { ret Event.gamepad_removed{ gamepad_device_event(raw) }; }
-    if (t == c.EVENT_GAMEPAD_BUTTON_DOWN) { ret Event.gamepad_button_down{ gamepad_button_event(raw) }; }
-    if (t == c.EVENT_GAMEPAD_BUTTON_UP) { ret Event.gamepad_button_up{ gamepad_button_event(raw) }; }
-    if (t == c.EVENT_GAMEPAD_AXIS_MOTION) { ret Event.gamepad_axis{ gamepad_axis_event(raw) }; }
-    ret Event.unknown{ t };
+    if (t == c.EVENT_QUIT)                   { ret Event.quit{}; }
+    if (t == c.EVENT_WINDOW_CLOSE_REQUESTED) { ret Event.window_close{window_event(raw)}; }
+    if (t == c.EVENT_WINDOW_RESIZED)         { ret Event.window_resized{window_event(raw)}; }
+    if (t == c.EVENT_WINDOW_FOCUS_GAINED)    { ret Event.window_focus_gained{window_event(raw)}; }
+    if (t == c.EVENT_WINDOW_FOCUS_LOST)      { ret Event.window_focus_lost{window_event(raw)}; }
+    if (t == c.EVENT_KEY_DOWN)               { ret Event.key_down{key_event(raw)}; }
+    if (t == c.EVENT_KEY_UP)                 { ret Event.key_up{key_event(raw)}; }
+    if (t == c.EVENT_MOUSE_MOTION)           { ret Event.mouse_motion{motion_event(raw)}; }
+    if (t == c.EVENT_MOUSE_BUTTON_DOWN)      { ret Event.mouse_button_down{button_event(raw)}; }
+    if (t == c.EVENT_MOUSE_BUTTON_UP)        { ret Event.mouse_button_up{button_event(raw)}; }
+    if (t == c.EVENT_MOUSE_WHEEL)            { ret Event.mouse_wheel{wheel_event(raw)}; }
+    if (t == c.EVENT_TEXT_INPUT)             { ret Event.text_input{text_event(raw)}; }
+    if (t == c.EVENT_GAMEPAD_ADDED)          { ret Event.gamepad_added{gamepad_device_event(raw)}; }
+    if (t == c.EVENT_GAMEPAD_REMOVED)        { ret Event.gamepad_removed{gamepad_device_event(raw)}; }
+    if (t == c.EVENT_GAMEPAD_BUTTON_DOWN)    { ret Event.gamepad_button_down{gamepad_button_event(raw)}; }
+    if (t == c.EVENT_GAMEPAD_BUTTON_UP)      { ret Event.gamepad_button_up{gamepad_button_event(raw)}; }
+    if (t == c.EVENT_GAMEPAD_AXIS_MOTION)    { ret Event.gamepad_axis{gamepad_axis_event(raw)}; }
+    ret Event.unknown{t};
 }
 
 # take the next event from the queue
@@ -293,5 +293,5 @@ pub fun poll() opt[Event] {
     if (c.SDL_PollEvent(?raw) == 0) {
         ret opt[Event].none{};
     }
-    ret opt[Event].some{ decode(?raw) };
+    ret opt[Event].some{decode(?raw)};
 }
